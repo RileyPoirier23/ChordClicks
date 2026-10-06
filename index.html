@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob: mediastream:; connect-src 'self' wss://irc-ws.chat.twitch.tv; frame-src https:; worker-src 'self' blob:; script-src 'self'">
+<title>ChordClicks</title>
+<link rel="stylesheet" href="src/styles.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+ <linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8b5cf6"/><stop offset="1" stop-color="#ec4899"/></linearGradient>
+ <symbol id="logo" viewBox="0 0 64 64"><path d="M32 3C49 3 60 14 58 29 56 45 41 59 32 61 23 59 8 45 6 29 4 14 15 3 32 3Z" fill="url(#lg)"/><path d="M36 12 20 35h10l-3 17 17-25H34Z" fill="#fff"/></symbol>
+</defs></svg>
+<video id="cam" autoplay playsinline muted></video><video id="pip" muted playsinline></video><canvas id="out" width="1280" height="720"></canvas>
+<div id="ambient"><i></i><i></i></div>
+<div id="toast"></div>
+
+<div id="shell">
+ <nav id="rail">
+  <svg class="brand" viewBox="0 0 64 64"><title>ChordClicks · Created by Riley Mackay-Poirier @506clicks</title><use href="#logo"/></svg>
+  <button class="nav on" data-view="practice"><svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg><span>Practice</span></button>
+  <button class="nav" data-view="library"><svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><span>Library</span></button>
+  <button class="nav" data-view="find"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span>Find</span></button>
+  <button class="nav" data-view="solo"><svg viewBox="0 0 24 24"><path d="M13 2 3 14h9l-1 8 10-12h-9z"/></svg><span>Solo</span></button>
+  <button class="nav" data-view="scales"><svg viewBox="0 0 24 24"><path d="M3 20h4v-4h4v-4h4V8h6"/><path d="M3 20V4"/></svg><span>Scales</span></button>
+  <button class="nav" data-view="learn"><svg viewBox="0 0 24 24"><path d="M22 10 12 5 2 10l10 5 10-5z"/><path d="M6 12v5c3 2 9 2 12 0v-5"/></svg><span>Learn</span></button>
+  <button class="nav" data-view="tuner"><svg viewBox="0 0 24 24"><path d="M4 18a9 9 0 1 1 16 0"/><path d="m12 14 4-5"/><circle cx="12" cy="15" r="1"/></svg><span>Tuner</span></button>
+  <button class="nav" data-view="gear"><svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"/><circle cx="12" cy="9" r="2.5"/><circle cx="12" cy="16" r="1.2"/></svg><span>Gear</span></button>
+  <button class="nav" data-view="stream"><svg viewBox="0 0 24 24"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="m22 8-6 4 6 4z"/></svg><span>Stream</span></button>
+  <button class="nav" data-view="settings"><svg viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h2M10 12h10M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="8" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg><span>Settings</span></button>
+  <div class="spacer"></div>
+  <button id="acct" class="guest" title="Sign in or create an account"><span id="acctI">?</span><span id="acctN">Guest</span></button>
+ </nav>
+
+ <div id="main">
+  <header id="top">
+   <div id="np"><b id="np-t">No song loaded</b><span id="np-s">Search Ultimate Guitar or open your library</span></div>
+   <label class="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+    <input id="q" list="sugg" autocomplete="off" placeholder="Search Ultimate Guitar or your library"><datalist id="sugg"></datalist>
+    <button class="btn p sm" id="ug">Search</button></label>
+   <button class="btn" id="recb" title="Record camera + overlay + audio">● Rec</button><button class="btn" id="pipb" title="Floating preview window">Float</button>
+   <button class="btn" id="cleanb" title="Fullscreen output only (Esc to exit)">Clean</button>
+   <span id="vstat" class="pill">Virtual cam off</span>
+  </header>
+
+  <div id="views">
+   <!-- ============ PRACTICE ============ -->
+   <section class="view on" id="v-practice">
+    <div class="col-main">
+     <div class="card preview"><canvas class="mirror" id="pv" width="1280" height="720"></canvas>
+      <div class="ov-chips" id="ovchips"><span class="chip" data-m="full">Full</span><span class="chip" data-m="banner">Banner</span><span class="chip" data-m="corner">Corner</span><span class="chip" data-m="pill">Pill</span><span class="chip" data-m="side">Side</span><span class="chip" data-m="stage">Stage</span><span class="chip" data-m="off">Off</span></div></div>
+     <div class="card solopanel" id="solopanel"><div class="sp-tag">SOLO</div><canvas id="sp-fret"></canvas></div>
+     <div class="card now">
+      <div class="hero"><div id="cur">—</div><div id="nxt">Next —</div><div style="margin-top:8px"><span class="tag" id="sectag" style="display:none"></span> <span class="tag" id="fb" style="display:none"></span></div><div class="newch" id="newch"></div></div>
+      <canvas id="cdiag" width="260" height="300"></canvas>
+      <div class="strumwrap">
+       <div id="strum"></div>
+       <div class="row" style="margin-top:0"><select id="patsel" title="Strumming patterns for this song"></select><input id="pat" class="grow" value="D-DU-UDU" spellcheck="false" title="D = down, U = up, - = rest. One symbol per slot."><button class="btn sm" id="patsave" title="Save this pattern on the song">Save</button></div>
+       <div class="transport">
+        <button class="btn" id="sp" title="Previous song in playlist">⏮</button><button class="btn" id="cp" title="Previous chord (←)">◀</button>
+        <button class="btn p big" id="play" title="Space">▶ Start</button>
+        <button class="btn" id="cn" title="Next chord (→)">▶</button><button class="btn" id="sn" title="Next song in playlist">⏭</button>
+        <span class="small" id="qinfo"></span></div>
+      </div>
+     </div>
+    </div>
+    <div class="col-side">
+     <div class="card sheetcard">
+      <div class="sh-head"><b id="sh-title">Chord sheet</b>
+       <label class="tg" title="Keep the current chord in view"><span class="sw"><input type="checkbox" id="follow" checked><i></i></span>Follow</label>
+       <button class="btn sm" id="xpose" title="Transpose, capo helper, key">Key / Capo</button><button class="btn sm" id="editb">Edit</button></div>
+      <div id="secs"></div>
+      <div id="sheet">Paste a chord sheet with Edit, or import one from Ultimate Guitar in Find.</div>
+      <div id="pastewrap" style="display:none;flex:1;flex-direction:column;min-height:0"><textarea id="paste" spellcheck="false" placeholder="Paste chords or tab text (also works with [ch]Am[/ch])"></textarea>
+       <div class="row" style="margin:0 14px 12px"><button class="btn p sm" id="parse">Apply</button><span class="small">Strumming lines in the text are picked up automatically.</span></div></div>
+     </div>
+     <div class="card metro">
+      <div class="bpmrow"><button class="btn" id="m-">−</button><div id="bpm">90</div><button class="btn" id="m+">+</button><input type="range" id="bpmr" min="30" max="240" value="90"><button class="btn sm" id="tap">Tap</button></div>
+      <div class="beatdots" id="bdots"></div>
+      <div class="row"><label class="l">Beats / bar</label><select id="beats"><option>2</option><option>3</option><option selected>4</option><option>5</option><option>6</option><option>7</option></select>
+       <label class="l" style="min-width:0">Subdivide</label><select id="sub"><option value="1">Quarter</option><option value="2" selected>8ths</option><option value="3">Triplets</option><option value="4">16ths</option></select></div>
+      <div class="row"><label class="l">Volume</label><input type="range" id="vol" min="0" max="1" step=".05" value=".7"><label class="tg"><span class="sw"><input type="checkbox" id="autoc" checked><i></i></span>Auto chord</label></div>
+     </div>
+     <div class="card trainer">
+      <h4>Loop &amp; slow-down trainer</h4>
+      <div class="row"><label class="l">Loop</label><select id="loopsel" class="grow"></select></div>
+      <div class="row" id="looprange" style="display:none"><label class="l">Chords</label><input type="number" id="loopfrom" min="1" value="1" style="width:64px"><span class="small">to</span><input type="number" id="loopto" min="1" value="4" style="width:64px"><span class="small">(chord numbers in the sheet)</span></div>
+      <div class="row"><label class="tg" title="Start slower and speed up by 5% after each clean pass of the loop"><span class="sw"><input type="checkbox" id="ramp"><i></i></span>Ramp tempo up as I succeed</label></div>
+      <div class="row" id="rampset" style="display:none"><label class="l">Start at</label><input type="range" id="rampstart" min="40" max="95" step="5" value="60" style="min-width:60px"><b id="rampstart-v" style="min-width:42px">60%</b></div>
+      <div class="row"><label class="tg" title="Listens to your guitar and checks each chord. Needs a mic or interface."><span class="sw"><input type="checkbox" id="listen"><i></i></span>Listen to me &amp; check chords</label><span class="small" id="fbtxt"></span></div>
+      <div class="row small" id="speedrow" style="display:none">Tempo now <b id="speedv" style="color:var(--fg)">100%</b> · pass <b id="passv" style="color:var(--fg)">0</b></div>
+     </div>
+     <div class="card tools">
+      <h4>Timing &amp; backing</h4>
+      <div class="row"><label class="l">Accents</label><select id="accpat" class="grow"><option value="Xxxx">Beat 1 accented</option><option value="XxXx">1 &amp; 3 strong</option><option value="xXxX">Backbeat (2 &amp; 4)</option><option value="XXXX">Every beat strong</option><option value="X...">Click only on 1</option><option value="xxxx">No accent</option></select><label class="tg"><span class="sw"><input type="checkbox" id="flash" checked><i></i></span>Flash</label></div>
+      <div class="row"><label class="tg" title="Mutes the click for some bars so you have to keep time yourself"><span class="sw"><input type="checkbox" id="silent"><i></i></span>Silent bars</label><span class="small">play</span><input type="number" id="sil-play" min="1" max="16" value="3" style="width:54px"><span class="small">mute</span><input type="number" id="sil-mute" min="1" max="8" value="1" style="width:54px"></div>
+      <div class="row"><label class="tg"><span class="sw"><input type="checkbox" id="backing"><i></i></span>Backing track</label><select id="bstyle" class="grow"></select></div>
+      <div class="row"><label class="l">Volume</label><input type="range" id="bvol" min="0" max="1" step=".05" value=".6"><label class="tg" title="Plays the strumming pattern too, so you can solo or sing over it"><span class="sw"><input type="checkbox" id="bcomp"><i></i></span>Strum for me</label></div>
+     </div>
+    </div>
+   </section>
+
+   <!-- ============ LIBRARY ============ -->
+   <section class="view" id="v-library">
+    <aside class="card lib-side">
+     <h4>Library</h4><div id="pl-all"></div>
+     <h4>Genres</h4><div id="pl-genres"></div>
+     <h4 style="display:flex;justify-content:space-between;align-items:center">Playlists <button class="btn sm" id="pl-new">+ New</button></h4><div id="pl-list"></div>
+    </aside>
+    <div class="lib-main">
+     <div class="lib-head"><h2 id="lib-title">All songs</h2><span class="small" id="lib-sub"></span><span class="grow"></span>
+      <button class="btn sm" id="lib-import">+ Import…</button><button class="btn p sm" id="lib-play">▶ Play all</button><button class="btn sm" id="lib-shuf">Shuffle</button><button class="btn sm" id="lib-notes">Gig notes</button><button class="btn sm" id="lib-pdf" title="Save the set as a PDF with all chord sheets">Set PDF</button><button class="btn sm" id="lib-print">Print</button><button class="btn sm" id="lib-ren">Rename</button><button class="btn sm danger" id="lib-del">Delete</button>
+      <select id="lib-filter" title="Show songs by how playable they are for you"><option value="all">All songs</option><option value="play">Songs I can play now</option><option value="close">Almost there (≤2 new chords)</option></select><input id="lib-q" placeholder="Filter…" style="width:140px"><select id="lib-sort"><option value="recent">Recent</option><option value="title">Title</option><option value="artist">Artist</option></select></div>
+     <div id="songs"></div>
+    </div>
+   </section>
+
+   <!-- ============ FIND (Ultimate Guitar) ============ -->
+   <section class="view" id="v-find">
+    <div class="card findbar">
+     <button class="btn" id="ugback">← Back</button><button class="btn" id="ugh">UG home</button><span class="grow"></span>
+     <span class="small">Save to</span>
+     <input id="imp-genre" list="genres" placeholder="Genre (e.g. Rock)" style="width:150px"><datalist id="genres"></datalist>
+     <select id="imp-pl"></select>
+     <button class="btn" id="imp-paste" title="Paste text from any website">Paste instead…</button><button class="btn p" id="imp">Import this song</button>
+    </div>
+    <div class="card webwrap"><webview id="ugv" src="https://www.ultimate-guitar.com/" partition="persist:ug" allowpopups></webview></div>
+   </section>
+
+   <!-- ============ SOLO ============ -->
+   <section class="view" id="v-solo">
+    <div class="card solo-top">
+     <select id="solo-sel"></select>
+     <button class="btn sm" id="solo-demo">Try demo</button><button class="btn sm" id="solo-paste-toggle">Paste a tab</button>
+     <span class="grow"></span>
+     <label class="tg">Speed <input type="range" id="solo-speed" min="40" max="130" value="100" style="width:110px"><b id="solo-speed-v" style="color:var(--fg);min-width:40px">100%</b></label>
+     <label class="tg">BPM <input type="number" id="solo-bpm" min="30" max="260" value="90" style="width:68px"></label>
+     <label class="tg"><span class="sw"><input type="checkbox" id="solo-click" checked><i></i></span>Click</label>
+     <label class="tg"><span class="sw"><input type="checkbox" id="solo-loop"><i></i></span>Loop</label>
+     <label class="tg" title="Mirror the fretboard for left-handed players"><span class="sw"><input type="checkbox" id="solo-flip"><i></i></span>Lefty</label>
+     <label class="tg" title="Show the fretboard on your camera output while a solo plays"><span class="sw"><input type="checkbox" id="solo-cam" checked><i></i></span>On camera</label>
+    </div>
+    <div class="card solo-top">
+     <div class="seg" id="solo-mode" title="Watch just scrolls. Score listens to your guitar and marks each note. Wait pauses until you play the right note."><button data-v="watch" class="on">Watch</button><button data-v="score">Score me</button><button data-v="wait">Wait for me</button></div>
+     <label class="tg" id="solo-lat-wrap" hidden title="Compensates for the delay between you playing and the app hearing it. Raise it if good notes count as misses.">Latency <input type="range" id="solo-lat" min="0" max="300" value="100" style="width:90px"><b id="solo-lat-v" style="color:var(--fg);min-width:52px">100 ms</b></label>
+     <span class="grow"></span>
+     <span id="solo-range" class="tg">Loop bars <select id="solo-from"></select> to <select id="solo-to"></select></span>
+     <label class="tg" title="Each clean pass raises the tempo 5%; a messy pass lowers it."><span class="sw"><input type="checkbox" id="solo-ramp"><i></i></span>Ramp tempo as I improve</label>
+    </div>
+    <div class="card canv-card"><canvas id="fret"></canvas>
+     <div id="soloempty"><div><b>No solo loaded</b>Open a song that has ASCII tab (e|---5-7---|), paste one with “Paste a tab”,<br>or hit “Try demo” to see how it works.</div></div></div>
+    <div class="card canv-card"><canvas id="hw"></canvas><div id="countin"></div></div>
+    <div class="card solo-bar"><button class="btn p" id="solo-play">▶ Play</button><button class="btn" id="solo-restart">⟲</button><input type="range" id="solo-scrub" min="0" max="1000" value="0"><span class="small" id="solo-time" style="min-width:90px;text-align:right">0:00</span></div>
+    <div class="card pad" id="solo-pastebox" style="display:none;position:absolute;left:120px;right:40px;bottom:90px;z-index:5;background:#13131e">
+     <textarea id="solo-text" rows="8" spellcheck="false" placeholder="e|---------0---|&#10;B|-------1-----|&#10;G|-----0-------|&#10;D|---2---------|&#10;A|-3-----------|&#10;E|-------------|"></textarea>
+     <div class="row"><button class="btn p sm" id="solo-load">Load tab</button><button class="btn sm" id="solo-save">Save to this song</button><span class="small">Six lines, high e on top. Several blocks in a row become one long solo.</span></div></div>
+   </section>
+
+   <!-- ============ SCALES ============ -->
+   <section class="view" id="v-scales">
+    <aside class="card scales-side">
+     <h4>Pick a key <span class="small" style="text-transform:none;letter-spacing:0">(circle of fifths)</span></h4>
+     <svg id="sc-wheel" viewBox="-130 -130 260 260"></svg>
+     <div class="prog"><div class="meter"><i id="sc-progress" style="width:0"></i></div><div class="small" id="sc-progtxt"></div></div>
+     <div id="sc-typewrap"><h4 id="sc-typeh">Scale</h4><div id="sc-types"></div></div>
+     <h4>Labels</h4><div class="seg" id="sc-show"><button data-v="notes" class="on">Notes</button><button data-v="degrees">Degrees</button><button data-v="fret">Frets</button></div>
+     <div class="row"><label class="tg"><span class="sw"><input type="checkbox" id="sc-hide"><i></i></span>Hide labels (test yourself)</label></div>
+     <h4>Practice</h4>
+     <div class="row"><button class="btn p" id="sc-play">▶ Hear it</button><input type="range" id="sc-speed" min="50" max="200" value="100" style="min-width:60px"></div>
+     <div class="row"><button class="btn" id="sc-drill" title="Opens it in Solo mode so the app listens and scores you">🎯 Play it on guitar</button></div>
+     <div class="row"><button class="btn" id="sc-quiz">Quiz: spell a scale</button><button class="btn" id="sc-learned">Mark as learned</button></div>
+     <h4>Jam in this key</h4>
+     <div class="row"><select id="sc-prog" class="grow"></select><button class="btn" id="sc-jam">Jam</button></div>
+    </aside>
+    <div class="scales-main">
+     <div class="seg wide" id="sc-tabs"><button data-t="scales" class="on">Scales</button><button data-t="arp">Arpeggios</button><button data-t="triad">Triads</button><button data-t="caged">CAGED</button></div>
+     <div class="card sc-head"><div><h2 id="sc-title"></h2><div class="small" id="sc-sig"></div></div><div id="sc-noterow"></div></div>
+     <div class="card sc-info"><div id="sc-formula"></div><div class="small" id="sc-rel"></div></div>
+     <div class="card canv-card" style="min-height:230px"><canvas id="scfret"></canvas></div>
+     <div class="card sc-info" id="sc-sub"></div>
+     <div class="card sc-info" id="sc-chordsbox"><div class="small" style="margin-bottom:6px">Chords in this key</div><div id="sc-chords" class="dchs"></div></div>
+     <div class="card sc-info" id="sc-quizbox" style="display:none"></div>
+    </div>
+   </section>
+
+   <!-- ============ LEARN ============ -->
+   <section class="view" id="v-learn">
+    <div class="seg wide" id="ln-tabs"><button data-t="chords" class="on">Chord library</button><button data-t="changes">Chord changes</button><button data-t="ear">Ear training</button><button data-t="theory">Theory</button><button data-t="progress">Progress</button></div>
+    <div class="ln-pane on" id="ln-chords"></div>
+    <div class="ln-pane" id="ln-changes"></div>
+    <div class="ln-pane" id="ln-ear"></div>
+    <div class="ln-pane" id="ln-theory"></div>
+    <div class="ln-pane" id="ln-progress"></div>
+   </section>
+
+   <!-- ============ TUNER ============ -->
+   <section class="view" id="v-tuner">
+    <div class="card tuner-main">
+     <canvas id="gauge" width="1120" height="590"></canvas>
+     <div id="tnote">—</div><div id="tinfo">Pick your input, then press Start</div>
+     <div id="tstrings"></div>
+     <button class="btn p big" id="tonbtn" style="padding:12px 30px;font-size:15px">Start tuner</button>
+    </div>
+    <div class="card tuner-side">
+     <h4>Input</h4>
+     <div class="row"><select id="micsel" class="grow"></select><button class="btn sm" id="micref" title="Refresh devices">↻</button></div>
+     <div class="small">Level</div><div class="meter" id="lvlm"><i id="lvl"></i><b id="gatem"></b></div>
+     <h4>Tuning</h4>
+     <div class="row"><select id="tunsel" class="grow"></select></div>
+     <h4>Detection</h4>
+     <div class="row"><div class="seg" id="tmode"><button data-v="auto" class="on">Auto</button><button data-v="lock">Lock string</button><button data-v="chrom">Chromatic</button></div></div>
+     <div class="row"><label class="tg"><span class="sw"><input type="checkbox" id="isol" checked><i></i></span>Isolate guitar</label></div>
+     <div class="small">Filters out hum, hiss and voices outside the guitar’s range and focuses on the string you’re tuning.</div>
+     <div class="row"><label class="l">Gate</label><input type="range" id="gate" min="0" max="100" value="22"></div>
+     <div class="row"><label class="l">A4 =</label><input type="number" id="a4" min="400" max="480" value="440" style="width:80px"><span class="small">Hz</span></div>
+     <h4>Intonation</h4><div id="intn"></div>
+     <div class="hint">For the cleanest reading, pick your audio interface or a clip-on / contact mic as the input. A laptop mic works, but turn the gate up in a noisy room and pluck one string at a time.</div>
+    </div>
+   </section>
+
+   <!-- ============ GEAR ============ -->
+   <section class="view" id="v-gear">
+    <div class="gear-top card">
+     <button class="btn p big" id="g-power">Power on</button>
+     <select id="g-dev" class="grow"></select><button class="btn sm" id="g-ref" title="Refresh devices">↻</button>
+     <label class="tg" title="Hear your processed guitar. Use headphones to avoid feedback."><span class="sw"><input type="checkbox" id="g-mon"><i></i></span>Monitor</label>
+     <button class="chip" id="g-hp" title="Tick when you are wearing headphones">🎧 Headphones</button>
+     <div class="seg" id="g-tabs"><button class="on" data-t="rig">Pedals &amp; Amp</button><button data-t="loop">Looper</button><button data-t="rec">Record</button></div>
+    </div>
+    <div class="gear-live card">
+     <div class="meter"><i id="g-lvl"></i></div><b id="g-db">off</b>
+     <div class="gnote"><b id="g-note">—</b><span class="gc"><i id="g-cents"></i></span></div>
+     <div class="tip ok" id="g-tip"></div>
+     <label class="tg">Input<input type="range" id="g-in" min="0" max="3" step=".05" value="1" style="width:90px"></label>
+     <label class="tg">Gate<input type="range" id="g-gate" min="0" max="60" value="0" style="width:90px"></label>
+     <select id="g-pre" title="Starting points"></select>
+    </div>
+    <div class="g-pane on" id="gp-rig"><div id="g-board"></div></div>
+    <div class="g-pane" id="gp-loop"><div class="card lp">
+      <div class="lp-ring" id="lp-ring"><div><b class="lp-state idle" id="lp-state">Ready</b></div></div>
+      <div class="lp-ctl">
+       <div class="row"><button class="btn p big" id="lp-rec">● Record</button><button class="btn big" id="lp-over">Overdub</button><button class="btn big" id="lp-play">Play / Stop</button><button class="btn" id="lp-undo">Undo</button><button class="btn danger" id="lp-clear">Clear</button></div>
+       <div class="row"><label class="l">Length</label><select id="lp-bars"><option value="0">Free (tap Finish)</option><option value="1">1 bar</option><option value="2">2 bars</option><option value="4" selected>4 bars</option><option value="8">8 bars</option></select>
+        <label class="tg"><span class="sw"><input type="checkbox" id="lp-count" checked><i></i></span>Count-in</label>
+        <label class="l" title="Shift recorded audio earlier to cancel your sound card's delay">Latency fix</label><input type="number" id="lp-comp" value="0" min="0" max="300" style="width:70px"><span class="small">ms</span></div>
+       <div class="small">Tempo and beats come from the Practice metronome. Loops are recorded after the pedals and amp, so overdubs keep your tone.</div>
+       <div id="lp-layers"></div></div></div></div>
+    <div class="g-pane" id="gp-rec"><div class="card pad">
+      <div class="row"><button class="btn p big" id="rc-btn">● Start recording</button><b id="rc-time" style="font-variant-numeric:tabular-nums;font-size:20px">0:00</b></div>
+      <div class="row"><label class="tg"><span class="sw"><input type="checkbox" id="rc-vid" checked><i></i></span>Camera + overlay video</label>
+       <label class="tg"><span class="sw"><input type="checkbox" id="rc-gtr" checked><i></i></span>Guitar (with pedals)</label>
+       <label class="tg"><span class="sw"><input type="checkbox" id="rc-click"><i></i></span>Metronome &amp; backing</label></div>
+      <div class="small">Records what the camera output shows, plus your processed guitar and any backing track. Takes appear below and can be saved to disk.</div>
+      <div id="rc-takes"></div></div></div>
+   </section>
+
+   <!-- ============ STREAM ============ -->
+   <section class="view" id="v-stream">
+    <div class="stack">
+     <div class="card" style="padding:0;overflow:hidden;aspect-ratio:16/9"><canvas class="mirror" id="pv2" width="1280" height="720"></canvas></div>
+     <div class="card"><h4>Virtual camera</h4>
+      <div class="row"><button class="btn p" id="vcam">Start virtual camera</button><button class="btn" id="vsetup">Set up virtual camera</button></div>
+      <div class="small" id="vmsg">Sends this preview to Zoom, Discord, Teams or OBS. Run setup once, then restart your video app.</div></div>
+     <div class="card"><h4>Scenes <span class="small" style="text-transform:none;letter-spacing:0">(Alt+1…4 or your hotkeys)</span></h4><div id="scenes" class="pos"></div>
+      <div class="row"><button class="btn sm" id="scene-save">Save current as…</button><button class="btn sm" id="scene-del">Delete selected</button></div><div class="small">A scene remembers the layout, position, size, shown elements and camera dimming.</div></div>
+     <div class="card"><h4>Chat requests <span class="small" style="text-transform:none;letter-spacing:0">(Twitch)</span></h4>
+      <div class="row"><input id="ch-chan" class="grow" placeholder="Your Twitch channel name"><button class="btn p" id="ch-conn">Connect</button></div>
+      <div class="row"><input id="ch-pref" class="grow" value="!request, !sr, !song" title="Chat commands that add a song"><label class="tg"><span class="sw"><input type="checkbox" id="ch-lib" checked><i></i></span>Library only</label></div>
+      <div class="small" id="ch-stat">Viewers type <b>!request Song name</b>. Reads chat anonymously — no login needed. YouTube chat isn’t supported.</div>
+      <div id="ch-q"></div><div class="row"><button class="btn sm" id="ch-next">Play next request</button><button class="btn sm" id="ch-clear">Clear</button><button class="btn sm" id="ch-test" title="Add a fake request to try it">Test</button></div></div>
+    </div>
+    <div class="stack">
+     <div class="card"><h4>Camera</h4><div class="row"><select id="camsel" class="grow"></select></div>
+      <div class="row"><label class="tg"><span class="sw"><input type="checkbox" id="mir"><i></i></span>Mirror camera</label></div>
+      <div class="row"><label class="l">Dim camera</label><input type="range" id="opr" min="0" max=".9" step=".05" value=".25"></div></div>
+     <div class="card"><h4>Overlay layout</h4><div class="layouts" id="layouts"></div>
+      <div class="row" style="margin-top:14px"><label class="l">Position</label><div class="posgrid" id="posgrid"></div></div>
+      <div class="row"><label class="l">Size</label><input type="range" id="ov-scale" min="50" max="140" value="100"><b id="ov-scale-v" style="min-width:42px">100%</b></div>
+      <div class="row"><label class="l">Panel opacity</label><input type="range" id="ov-bg" min="0" max="100" value="55"></div>
+      <h4>Show on camera</h4><div class="elgrid" id="elgrid"></div></div>
+    </div>
+   </section>
+
+   <!-- ============ SETTINGS ============ -->
+   <section class="view" id="v-settings">
+    <div class="stack">
+     <div class="card"><h4>Look</h4>
+      <div class="row"><label class="l">Accent</label><div class="swatches" id="swatches"></div><input type="color" id="acc" value="#8b5cf6" style="padding:0;width:34px;height:30px;border-radius:8px"></div>
+      <div class="row"><label class="l">Sheet text</label><input type="range" id="fsr" min="12" max="34" value="17"></div>
+      <div class="row"><label class="l">Auto-scroll</label><input type="range" id="asr" min="0" max="10" value="0"></div>
+      <div class="row"><label class="tg"><span class="sw"><input type="checkbox" id="autopat" checked><i></i></span>Switch strumming pattern by song section</label></div>
+      <div class="row"><label class="tg"><span class="sw"><input type="checkbox" id="motion" checked><i></i></span>Animated background</label></div></div>
+    </div>
+    <div class="stack">
+     <div class="card"><h4>Account &amp; songs</h4><div id="acct-info" class="small"></div>
+      <div class="row"><button class="btn" id="acct-btn">Sign in</button><button class="btn" id="exp">Export songs</button><button class="btn" id="imp-lib">Import songs</button></div></div>
+     <div class="card"><h4>Hotkeys &amp; foot pedal</h4><div class="small" style="margin-bottom:8px">Click a box, then press the key. <b>Global</b> keys work even when the app isn’t focused (desktop app). <b>MIDI</b>: click Learn, then press your pedal.</div><div id="hk-table"></div><div class="row"><button class="btn sm" id="hk-reset">Reset to defaults</button><span class="small" id="hk-midi">MIDI: not checked</span></div></div>
+     <div class="card"><h4>Cloud sync <span class="small" style="text-transform:none;letter-spacing:0">(optional)</span></h4><div id="sync-body"></div></div>
+     <div class="card"><h4>About</h4><div class="small"><b>ChordClicks</b> <span id="ver"></span><br>Created by Riley Mackay-Poirier <a href="https://www.506clicks.ca" target="_blank" rel="noreferrer" style="color:inherit;font-weight:700">@506clicks</a><br>Keys: ← → chords · Space start/stop · Esc leaves Clean mode</div></div>
+    </div>
+   </section>
+  </div>
+ </div>
+</div>
+
+<div id="cleanwrap"><canvas class="mirror" id="pvc" width="1280" height="720"></canvas></div>
+<div id="modal"><div class="dlg" id="dlg"></div></div>
+
+<script src="src/lib/theory.js"></script>
+<script src="src/lib/pitch.js"></script>
+<script src="src/lib/song.js"></script>
+<script src="src/lib/chroma.js"></script>
+<script src="src/lib/sync.js"></script>
+<script src="src/lib/requests.js"></script>
+<script src="src/js/audio.js"></script>
+<script src="src/js/store.js"></script>
+<script src="src/js/fretboard.js"></script>
+<script src="src/js/overlay.js"></script>
+<script src="src/js/solo.js"></script>
+<script src="src/js/tuner.js"></script>
+<script src="src/js/backing.js"></script>
+<script src="src/js/gear.js"></script>
+<script src="src/js/chords.js"></script>
+<script src="src/js/library2.js"></script>
+<script src="src/js/controls.js"></script>
+<script src="src/js/learn.js"></script>
+<script src="src/js/scales.js"></script>
+<script src="src/js/app.js"></script>
+</body></html>

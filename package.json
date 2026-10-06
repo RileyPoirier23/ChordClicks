@@ -1,0 +1,114 @@
+{
+  "name": "chordclicks",
+  "productName": "ChordClicks",
+  "version": "3.0.0",
+  "description": "Practice songs, scales and solos with chords burned into your camera feed.",
+  "author": {
+    "name": "Riley Mackay-Poirier",
+    "url": "https://www.506clicks.ca"
+  },
+  "homepage": "https://github.com/RileyPoirier23/chordclicks",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test test/lib.test.js test/auth.test.js test/server.test.js",
+    "assets": "python build/make_assets.py",
+    "dist": "electron-builder --win --publish never",
+    "dist:portable": "electron-builder --win portable --publish never",
+    "server": "node server/server.js"
+  },
+  "devDependencies": {
+    "electron": "^44.5.1",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "ca.506clicks.chordclicks",
+    "productName": "ChordClicks",
+    "copyright": "Copyright © 2026 Riley Mackay-Poirier (506Clicks)",
+    "directories": {
+      "buildResources": "build",
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "auth.js",
+      "index.html",
+      "package.json",
+      "src/**/*",
+      "build/icon.png",
+      "node_modules/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "scripts",
+        "to": "scripts"
+      },
+      {
+        "from": "setup",
+        "to": "setup"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "artifactName": "ChordClicks-${version}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "ChordClicks",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico",
+      "installerHeader": "build/installerHeader.bmp",
+      "installerSidebar": "build/installerSidebar.bmp",
+      "uninstallerSidebar": "build/uninstallerSidebar.bmp",
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false,
+      "include": "build/installer.nsh",
+      "artifactName": "ChordClicks-${version}-setup.${ext}"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "build/icon.png"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "build/icon.png"
+    },
+    "portable": {
+      "artifactName": "ChordClicks-${version}-portable.${ext}"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "RileyPoirier23",
+        "repo": "chordclicks"
+      }
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/RileyPoirier23/chordclicks.git"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
+  }
+}

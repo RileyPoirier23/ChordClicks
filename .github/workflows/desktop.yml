@@ -1,0 +1,82 @@
+name: Desktop build
+
+# Builds the Windows app (installer + portable .exe) on a real Windows runner.
+# Every push to main uploads the .exe files as a downloadable
+# artifact (Actions tab -> the run -> Artifacts). Pushing a tag like v3.0.1 also
+# publishes a GitHub Release with the downloads attached.
+on:
+  workflow_dispatch:
+  push:
+    branches: ['main']
+    tags: ['v*']
+    paths-ignore: ['**.md']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Version from tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: npm version "${GITHUB_REF_NAME#v}" --no-git-tag-version --allow-same-version
+      - run: npm test
+      - run: npm run dist
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - name: Stable download names (for links on the website)
+        shell: bash
+        run: |
+          cp dist/ChordClicks-*-setup.exe dist/ChordClicks-Setup.exe
+          cp dist/ChordClicks-*-portable.exe dist/ChordClicks-Portable.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ChordClicks-windows
+          path: |
+            dist/*.exe
+            dist/latest.yml
+          if-no-files-found: error
+      # A release goes out for a v* tag, or automatically when package.json's version
+      # is bumped and no release for that version exists yet.
+      - name: Release needed?
+        id: rel
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          v="v$(node -p "require('./package.json').version")"
+          echo "tag=$v" >> "$GITHUB_OUTPUT"
+          if gh release view "$v" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then echo "needed=false" >> "$GITHUB_OUTPUT"; else echo "needed=true" >> "$GITHUB_OUTPUT"; fi
+      # release notes come from the commit message (the website's "What's new" reads them)
+      - name: Release notes
+        if: startsWith(github.ref, 'refs/tags/v') || steps.rel.outputs.needed == 'true'
+        shell: bash
+        env:
+          MSG: ${{ github.event.head_commit.message }}
+        run: |
+          printf '%s\n' "${MSG:-New build of ChordClicks.}" | grep -viE '^(co-authored-by|claude-session):' > release-notes.md || echo "New build of ChordClicks." > release-notes.md
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v') || steps.rel.outputs.needed == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.rel.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: ChordClicks ${{ steps.rel.outputs.tag }}
+          body_path: release-notes.md
+          # latest.yml + .blockmap are what installed copies read to update themselves
+          files: |
+            dist/*.exe
+            dist/*.blockmap
+            dist/latest.yml
