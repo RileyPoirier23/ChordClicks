@@ -128,7 +128,7 @@
     R.start({ canvas: document.getElementById('out'), video: $('rc-vid').checked }); $('rc-btn').textContent = '■ Stop'; $('rc-btn').classList.add('rec');
   }
   function addTake(t) {
-    if (!t) return; const ext = t.video ? 'webm' : 'webm', name = 'RCC-take-' + new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19) + '.' + ext;
+    if (!t) return; const ext = t.ext || 'webm', name = 'RCC-take-' + new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19) + '.' + ext;
     t.file = name; const el = document.createElement('div'); el.className = 'take';
     el.innerHTML = `<${t.video ? 'video' : 'audio'} src="${t.url}" controls ${t.video ? 'muted' : ''}></${t.video ? 'video' : 'audio'}><div><b>${t.name}</b><div class="small">${Math.round(t.dur)}s · ${(t.size / 1048576).toFixed(1)} MB · ${t.video ? 'camera + overlay + audio' : 'audio only'}</div><div class="row"><button class="btn sm p save">Save…</button></div></div>`;
     el.querySelector('.save').onclick = async () => {

@@ -22,6 +22,12 @@
   };
   A.resume = () => { const c = A.get(); return c.state === 'suspended' ? c.resume() : Promise.resolve(); };
   A.setClickRecorded = on => { A.get(); A.clickRec.gain.value = on ? 1 : 0; };
+  /** Raw mic/voice straight into recordings (phone videos). Separate from the guitar rig path. */
+  A.setMicRecorded = async on => {
+    const c = A.get();
+    if (on && !A._micRec) { const src = await In.open(); A._micRec = g(c, 1); src.connect(A._micRec); A._micRec.connect(A.recDest); A._micRe = s => s.connect(A._micRec); In.onChange(A._micRe); }
+    else if (!on && A._micRec) { try { A._micRec.disconnect(); } catch (e) {} A._micRec = null; In._l = In._l.filter(f => f !== A._micRe); In.release(); }
+  };
 
   /* ================================================================ synth voices */
   let noiseBuf = null;
@@ -289,7 +295,7 @@
   Rec.start = function ({ canvas, video = true } = {}) {
     A.get(); const tracks = [...A.recDest.stream.getAudioTracks()];
     if (video && canvas) tracks.unshift(...canvas.captureStream(30).getVideoTracks());
-    const stream = new MediaStream(tracks), pick = (video ? ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'] : ['audio/webm;codecs=opus', 'audio/webm']).find(m => MediaRecorder.isTypeSupported(m)) || '';
+    const stream = new MediaStream(tracks), pick = (video ? ['video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/mp4;codecs=avc1,mp4a.40.2', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'] : ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4']).find(m => MediaRecorder.isTypeSupported(m)) || '';
     Rec.mime = pick; Rec.video = video; Rec.chunks = [];
     Rec.rec = new MediaRecorder(stream, { mimeType: pick || undefined, videoBitsPerSecond: 5e6, audioBitsPerSecond: 192e3 });
     Rec.rec.ondataavailable = e => { if (e.data && e.data.size) Rec.chunks.push(e.data); };
@@ -299,7 +305,7 @@
   Rec.elapsed = () => (Rec.active() ? (performance.now() - Rec.t0) / 1000 : 0);
   Rec.stop = () => new Promise(res => {
     if (!Rec.rec) return res(null); const dur = (performance.now() - Rec.t0) / 1000;
-    Rec.rec.onstop = () => { const blob = new Blob(Rec.chunks, { type: Rec.mime || 'video/webm' }), take = { blob, url: URL.createObjectURL(blob), dur, video: Rec.video, name: new Date().toLocaleString(), size: blob.size }; Rec.takes.unshift(take); Rec.rec = null; res(take); };
+    Rec.rec.onstop = () => { const blob = new Blob(Rec.chunks, { type: Rec.mime || 'video/webm' }), take = { blob, url: URL.createObjectURL(blob), dur, video: Rec.video, name: new Date().toLocaleString(), size: blob.size, ext: /mp4/.test(Rec.mime || '') ? (Rec.video ? 'mp4' : 'm4a') : 'webm' }; Rec.takes.unshift(take); Rec.rec = null; res(take); };
     Rec.rec.stop();
   });
 

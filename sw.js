@@ -5,7 +5,7 @@ const SHELL = [
   './', './index.html', './manifest.webmanifest', './build/icon.png', './src/styles.css',
   './src/lib/theory.js', './src/lib/pitch.js', './src/lib/song.js', './src/lib/chroma.js', './src/lib/sync.js', './src/lib/requests.js',
   './src/js/audio.js', './src/js/capture-worklet.js', './src/js/store.js', './src/js/ug.js', './src/js/fretboard.js', './src/js/overlay.js', './src/js/solo.js',
-  './src/js/tuner.js', './src/js/backing.js', './src/js/gear.js', './src/js/chords.js', './src/js/library2.js', './src/js/controls.js',
+  './src/js/tuner.js', './src/js/backing.js', './src/js/gear.js', './src/js/record.js', './src/js/chords.js', './src/js/library2.js', './src/js/controls.js',
   './src/js/fingerpick.js', './src/js/learn.js', './src/js/scales.js', './src/js/app.js',
 ];
 self.addEventListener('install', e => { e.waitUntil(caches.open(VERSION).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });

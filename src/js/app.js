@@ -239,13 +239,13 @@
   }
 
   /* ================================================================ navigation */
-  const views = ['practice', 'library', 'find', 'solo', 'scales', 'learn', 'tuner', 'gear', 'stream', 'support', 'settings'];
+  const views = ['practice', 'library', 'find', 'solo', 'scales', 'learn', 'tuner', 'gear', 'stream', 'record', 'support', 'settings'];
   function show(v) {
     if (v !== 'tuner') RCC.tuner.stop();
     document.querySelectorAll('.nav').forEach(b => b.classList.toggle('on', b.dataset.view === v));
     views.forEach(n => $('v-' + n).classList.toggle('on', n === v));
     if (v === 'library') renderLib(); if (v === 'scales') RCC.scales.redraw(); if (v === 'stream') renderStreamUI(); if (v === 'practice') showChord();
-    if (v === 'find') { fillImportTargets(); paintOnline(); setTimeout(() => $('ug-q').focus(), 50); } if (v === 'learn') RCC.learn.redraw();
+    if (v === 'find') { fillImportTargets(); paintOnline(); setTimeout(() => $('ug-q').focus(), 50); } if (RCC.record) RCC.record.onView(v === 'record'); if (v === 'learn') RCC.learn.redraw();
   }
   document.querySelectorAll('.nav').forEach(b => b.onclick = () => show(b.dataset.view));
 
@@ -381,13 +381,20 @@
 
   /* ================================================================ camera + overlay + output */
   const cv = $('out'), cx = cv.getContext('2d', { willReadFrequently: true });
-  let stream = null, camId = ''; try { camId = localStorage.getItem('rcc-cam') || ''; } catch (e) {}
+  let stream = null, camId = '', facing = ''; try { camId = localStorage.getItem('rcc-cam') || ''; } catch (e) {}
+  /** 1280x720 (landscape) or 720x1280 (portrait). The virtual camera needs landscape, so it keeps that. */
+  function setOutputSize(w, h) {
+    if (cv.width === w && cv.height === h) return; if (vOn && (w !== 1280 || h !== 720)) { toast('Stop the virtual camera to record portrait'); return; }
+    [cv, $('pv'), $('pv2'), $('pvc'), $('pvr')].forEach(c => { if (c) { c.width = w; c.height = h; } }); OV.setSize(w, h);
+  }
   async function listCams() { try { const d = (await navigator.mediaDevices.enumerateDevices()).filter(x => x.kind === 'videoinput'); $('camsel').innerHTML = d.map((x, i) => `<option value="${x.deviceId}">${esc(x.label || 'Camera ' + (i + 1))}</option>`).join('') || '<option>No camera found</option>'; if (d.some(x => x.deviceId === camId)) $('camsel').value = camId; } catch (e) {} }
   async function startCam() {
-    try { if (stream) stream.getTracks().forEach(t => t.stop()); const v = { width: { ideal: 1280 }, height: { ideal: 720 } }; if (camId) v.deviceId = { exact: camId };
+    try { if (stream) stream.getTracks().forEach(t => t.stop()); const v = { width: { ideal: 1280 }, height: { ideal: 720 } }; if (facing) v.facingMode = { ideal: facing }; else if (camId) v.deviceId = { exact: camId };
       stream = await navigator.mediaDevices.getUserMedia({ video: v }); $('cam').srcObject = stream; camId = stream.getVideoTracks()[0].getSettings().deviceId || camId; await listCams();
-    } catch (e) { if (camId) { camId = ''; return startCam(); } toast('Camera unavailable (' + e.name + ')'); }
+    } catch (e) { if (camId || facing) { camId = ''; facing = ''; return startCam(); } toast('Camera unavailable (' + e.name + ')'); }
   }
+  /** Phones: flip between the selfie and the back camera. */
+  function flipCam() { facing = facing === 'environment' ? 'user' : 'environment'; camId = ''; return startCam(); }
   $('camsel').onchange = e => { camId = e.target.value; try { localStorage.setItem('rcc-cam', camId); } catch (_) {} startCam(); };
   navigator.mediaDevices && navigator.mediaDevices.addEventListener('devicechange', listCams);
 
@@ -399,7 +406,7 @@
     OV.render(cx, { opts: P.ov, video: $('cam'), mirror: P.mir, accent: P.accent, chord: prog[pi] ? prog[pi].c : '—', prog, pi, pat, stepNow, bpm: Math.round(curBpm()), running, solo: so, flash: flashV, flashAcc,
       stage: { lines: stageLines, cur: sti, sec: stageLines[sti] && stageLines[sti].sec }, queue: RCC.chat ? RCC.chat.queue : [] });
     const targets = [];
-    if ($('v-practice').classList.contains('on')) targets.push($('pv')); if ($('v-stream').classList.contains('on')) targets.push($('pv2')); if (document.body.classList.contains('clean')) targets.push($('pvc'));
+    if ($('v-practice').classList.contains('on')) targets.push($('pv')); if ($('v-stream').classList.contains('on')) targets.push($('pv2')); if ($('v-record').classList.contains('on')) targets.push($('pvr')); if (document.body.classList.contains('clean')) targets.push($('pvc'));
     targets.forEach(t => t.getContext('2d').drawImage(cv, 0, 0, t.width, t.height));
     // solo fretboard fades into the practice page when a solo section arrives
     const ps = RCC.solo.panelState(), sp = $('solopanel'), vis = !!(ps && ps.alpha > .02 && $('v-practice').classList.contains('on'));
@@ -412,7 +419,7 @@
   /* virtual camera (RGBA frames, same size as the canvas) */
   let vOn = false, vt = null;
   if (R) {
-    R.onStatus(m => { vOn = m.on; $('vmsg').textContent = m.text; $('vstat').textContent = m.on ? 'Virtual cam live' : 'Virtual cam off'; $('vstat').classList.toggle('on', m.on); $('vcam').textContent = m.on ? 'Stop virtual camera' : 'Start virtual camera'; clearInterval(vt); if (m.on) vt = setInterval(() => { try { R.frame(cx.getImageData(0, 0, 1280, 720).data.buffer); } catch (e) {} }, 33); });
+    R.onStatus(m => { vOn = m.on; $('vmsg').textContent = m.text; $('vstat').textContent = m.on ? 'Virtual cam live' : 'Virtual cam off'; $('vstat').classList.toggle('on', m.on); $('vcam').textContent = m.on ? 'Stop virtual camera' : 'Start virtual camera'; clearInterval(vt); if (m.on) vt = setInterval(() => { try { if (cv.width === 1280) R.frame(cx.getImageData(0, 0, 1280, 720).data.buffer); } catch (e) {} }, 33); });
     $('vcam').onclick = () => vOn ? R.stop() : R.start();
     $('vsetup').onclick = async () => { const r = await R.setupVcam(); toast(r.ok ? 'Setup started – approve the Windows prompt, then restart your video app.' : (r.error || 'Setup failed')); };
   } else { $('vcam').disabled = $('vsetup').disabled = true; $('vmsg').textContent = 'Virtual camera needs the desktop app.'; }
@@ -523,6 +530,7 @@
     RCC.tuner.init({ audio, toast });
     RCC.learn.init({ toast, audio, accent: () => P.accent, jam: (text, title) => { loadSong(tempSong(title, text, { artist: 'Theory lesson' })); show('practice'); }, useChord: n => { loadSong(tempSong(n, '[Chord]\n' + n, { artist: 'Chord library' })); show('practice'); }, track: o => Store.track(o), bpm: () => P.bpm, drill: (text, name) => { if (RCC.solo.openTab(text, name)) show('solo'); } });
     RCC.gear.init({ toast, bpm: () => P.bpm, beats: () => +$('beats').value });
+    if (RCC.record) RCC.record.init({ toast, setOutputSize, flipCam, setMode, modes: OV.MODES, P, saveP, running: () => running, toggle, songTitle: () => (song && song.title) || '', out: cv, renderStreamUI });
     RCC.scales.init({ audio, toast, track: o => Store.track(o), drill: (text, name) => { if (RCC.solo.openTab(text, name)) show('solo'); }, accent: () => P.accent, jam: (text, title) => { loadSong(tempSong(title, text, { artist: 'Scale Lab' })); show('practice'); } });
     await Store.init(); RCC.controls.init();
     renderAcct(); renderLib(); renderStreamUI();
@@ -538,6 +546,6 @@
     $('paste').value = text; if (song && metaPatch) { song.meta = Object.assign({}, song.meta || {}, metaPatch); if (song.id) Store.updateSong(song.id, { meta: song.meta }); }
     applyText(); renderSongHeader();
   }
-  RCC.app = { get song() { return song; }, get prog() { return prog; }, get pi() { return pi; }, get sheet() { return sheet; }, get running() { return running; }, loadSong, show, toast, dialog, closeDlg, askText, askConfirm, menu, esc, P, saveP, Store, setBpm, nav, setPi, toggle, playList, renderLib, tempSong, replaceText, applyText, setMode, renderStreamUI, TR };
+  RCC.app = { setOutputSize, flipCam, get song() { return song; }, get prog() { return prog; }, get pi() { return pi; }, get sheet() { return sheet; }, get running() { return running; }, loadSong, show, toast, dialog, closeDlg, askText, askConfirm, menu, esc, P, saveP, Store, setBpm, nav, setPi, toggle, playList, renderLib, tempSong, replaceText, applyText, setMode, renderStreamUI, TR };
   window.__rcc = { loadSong, show, get song() { return song; }, tempSong, P, ugSearch, UG };
 })();

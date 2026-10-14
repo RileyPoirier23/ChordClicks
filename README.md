@@ -17,6 +17,7 @@ The installer keeps itself up to date. Windows may warn about an unknown publish
 - **Learn**: chord-change trainer, ear training, fingerpicking patterns (p i m a, Travis, rolls, tremolo), theory lessons, chord library and progress tracking.
 - **Tuner**: chromatic tuner for guitar, bass, uke and 7-string, plus an intonation checker.
 - **Gear**: pedals, amp, a sample-accurate looper (AudioWorklet) and recorder.
+- **Record**: a camera view with the overlay burned in, a record button, then trim and title your take and save it to your camera roll (phone) or a file (desktop).
 - **Stream**: chord diagrams and fretboard overlaid on your webcam, karaoke-style Stage layout, scenes, Twitch chat song requests, and a virtual camera for Zoom, Discord, Teams or OBS.
 - **Library**: difficulty ratings, "songs I can play", transpose/capo, playlists, set notes and PDF export, optional cloud sync.
 
@@ -24,7 +25,8 @@ Upgrading from Chordify? Your accounts and songs are copied over automatically o
 
 ## Phone / tablet
 The same app runs as a native Android / iOS app through Capacitor, and as an installable web app (PWA). Saved songs,
-practice, solo scoring, scales, learn, tuner and gear all work with no connection; Ultimate Guitar search needs Wi-Fi.
+practice, solo scoring, scales, learn, tuner, gear and Record all work with no connection; Ultimate Guitar search needs Wi-Fi.
+Record mode shoots portrait or landscape with the front or back camera; the save step opens the share sheet so the video lands in Photos / the gallery.
 ```
 npm run web          # builds www/ (static bundle, also fine for any web host)
 npm run android      # syncs www/ into android/ and opens Android Studio

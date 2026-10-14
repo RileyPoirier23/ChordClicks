@@ -45,6 +45,7 @@ synthetic microphone input.
 | Fingerpicking patterns, tab generator for Solo | Learn view (`fingerpick.js`) |
 | Looper capture on the audio thread | `capture-worklet.js` (+ ScriptProcessor fallback) |
 | Offline: online/offline events, service worker, saved songs only | `app.js` paintOnline, `sw.js` |
+| Record mode: portrait/landscape output, countdown, trim (real-time re-encode), export via Capacitor Share → Web Share → Save dialog → download | `record.js`, `overlay.js` setSize, `audio.js` setMicRecorded |
 
 ## Phone apps (Capacitor)
 `npm run web` copies the app into `www/`; `npx cap sync` pushes it into `android/` and `ios/`. Open those with

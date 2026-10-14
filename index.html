@@ -30,6 +30,7 @@
   <button class="nav" data-view="tuner"><svg viewBox="0 0 24 24"><path d="M4 18a9 9 0 1 1 16 0"/><path d="m12 14 4-5"/><circle cx="12" cy="15" r="1"/></svg><span>Tuner</span></button>
   <button class="nav" data-view="gear"><svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"/><circle cx="12" cy="9" r="2.5"/><circle cx="12" cy="16" r="1.2"/></svg><span>Gear</span></button>
   <button class="nav" data-view="stream"><svg viewBox="0 0 24 24"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="m22 8-6 4 6 4z"/></svg><span>Stream</span></button>
+  <button class="nav" data-view="record"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5" fill="currentColor"/></svg><span>Record</span></button>
   <button class="nav" data-view="support"><svg viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg><span>Support</span></button>
   <button class="nav" data-view="settings"><svg viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h2M10 12h10M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="8" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg><span>Settings</span></button>
   <div class="spacer"></div>
@@ -293,6 +294,43 @@
     </div>
    </section>
 
+   <!-- ============ RECORD (camera + overlay -> video, trim, save) ============ -->
+   <section class="view" id="v-record">
+    <div class="rec-stage card" id="rec-stage">
+     <canvas class="mirror" id="pvr" width="1280" height="720"></canvas>
+     <div class="rec-hud"><span class="rec-dot"></span><b id="rec-time">0:00</b><span id="rec-song" class="ell"></span></div>
+     <div class="rec-top">
+      <button class="btn sm" id="rec-flip" title="Switch between front and back camera">⟲ Flip</button>
+      <button class="btn sm" id="rec-orient">Portrait</button>
+      <select id="rec-layout" title="Overlay layout"></select>
+      <label class="tg sm"><span class="sw"><input type="checkbox" id="rec-mir"><i></i></span>Mirror</label>
+     </div>
+     <div id="rec-count" hidden>3</div>
+     <div class="rec-bottom">
+      <div class="rec-opts">
+       <label class="tg"><span class="sw"><input type="checkbox" id="rec-mic" checked><i></i></span>Mic / voice</label>
+       <label class="tg"><span class="sw"><input type="checkbox" id="rec-click"><i></i></span>Click &amp; backing</label>
+       <label class="tg" title="Start the song (chords advance) when recording starts"><span class="sw"><input type="checkbox" id="rec-autosong" checked><i></i></span>Start song</label>
+       <label class="tg"><span class="sw"><input type="checkbox" id="rec-stopsong" checked><i></i></span>Stop song after</label>
+      </div>
+      <button id="rec-go" class="rec-btn" title="Record"><i></i></button>
+     </div>
+    </div>
+    <div class="card rec-edit" id="rec-edit" hidden>
+     <div class="row" style="margin:0 0 8px"><b style="font-size:16px">Your take</b><span class="small" id="rec-len"></span><span class="grow"></span><button class="btn sm" id="rec-again">Discard &amp; re-record</button></div>
+     <video id="rec-vid" playsinline controls></video>
+     <div class="rec-trim">
+      <div class="row"><label class="l">Start</label><input type="range" id="rec-a" min="0" max="10" step=".1" value="0"><b id="rec-ta" style="min-width:52px">0:00.0</b></div>
+      <div class="row"><label class="l">End</label><input type="range" id="rec-b" min="0" max="10" step=".1" value="10"><b id="rec-tb" style="min-width:52px">0:00.0</b></div>
+      <div class="row"><button class="btn sm" id="rec-preview">▶ Preview the cut</button><span class="small" id="rec-trimnote"></span></div>
+     </div>
+     <div class="row"><label class="l">Title</label><input id="rec-title" class="grow" maxlength="60"></div>
+     <div class="meter" style="margin:6px 0"><i id="rec-prog" style="width:0"></i></div>
+     <div class="row"><button class="btn p" id="rec-save">Save to camera roll</button><button class="btn" id="rec-keep">Keep for later</button><span class="small" id="rec-msg"></span></div>
+     <div class="small">On a phone the share sheet opens — pick <b>Save video</b> (iPhone) or your gallery app (Android). Takes also appear under Gear → Record.</div>
+    </div>
+   </section>
+
    <!-- ============ SUPPORT THE CREATOR ============ -->
    <section class="view" id="v-support">
     <div class="stack">
@@ -361,6 +399,7 @@
 <script src="src/js/tuner.js"></script>
 <script src="src/js/backing.js"></script>
 <script src="src/js/gear.js"></script>
+<script src="src/js/record.js"></script>
 <script src="src/js/chords.js"></script>
 <script src="src/js/library2.js"></script>
 <script src="src/js/controls.js"></script>

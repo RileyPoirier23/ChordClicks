@@ -81,7 +81,7 @@ ipcMain.handle('ug:fetch', async (e, url) => {
 /* ---------------------------------------------------------------- recordings, PDF, global hotkeys, cloud sync */
 ipcMain.handle('rec:save', async (e, { name, data }) => {
   const safe = String(name || 'take.webm').replace(/[^\w.\- ]/g, '_');
-  const r = await dialog.showSaveDialog(win, { title: 'Save recording', defaultPath: path.join(app.getPath('videos'), safe), filters: [{ name: 'WebM video/audio', extensions: ['webm'] }] });
+  const r = await dialog.showSaveDialog(win, { title: 'Save recording', defaultPath: path.join(app.getPath('videos'), safe), filters: [{ name: 'Video / audio', extensions: ['mp4', 'webm', 'm4a'] }] });
   if (r.canceled || !r.filePath) return { ok: false };
   fs.writeFileSync(r.filePath, Buffer.from(data)); return { ok: true, path: r.filePath };
 });
