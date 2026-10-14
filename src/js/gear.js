@@ -105,7 +105,7 @@
   function paintLooper() {
     const l = A.looper, st = { idle: 'Ready', rec: 'Recording…', play: 'Playing', over: 'Overdubbing…', stopped: 'Stopped' }[l.state];
     $('lp-state').textContent = st; $('lp-state').className = 'lp-state ' + l.state;
-    $('lp-rec').textContent = l.state === 'rec' ? '■ Finish loop' : '● Record'; $('lp-over').disabled = !l.layers.length || l.state === 'rec' || l.state === 'stopped';
+    $('lp-rec').textContent = l.state === 'rec' ? '■ Finish loop' : '● Record'; $('lp-over').disabled = !l.layers.length || l.state === 'rec' || l.state === 'over';
     $('lp-layers').innerHTML = l.layers.map((ly, i) => `<div class="layer"><b>Layer ${i + 1}</b><input type="range" min="0" max="1.5" step=".05" value="${ly.vol}" data-i="${i}"><button class="btn sm ${ly.mute ? 'danger' : ''}" data-m="${i}">${ly.mute ? 'Muted' : 'Mute'}</button></div>`).join('') || '<div class="small">No layers yet. Hit Record, play a phrase, then overdub on top.</div>';
     $('lp-layers').querySelectorAll('input').forEach(r => r.oninput = () => l.setVol(+r.dataset.i, +r.value));
     $('lp-layers').querySelectorAll('[data-m]').forEach(b => b.onclick = () => l.setMute(+b.dataset.m, !l.layers[+b.dataset.m].mute));

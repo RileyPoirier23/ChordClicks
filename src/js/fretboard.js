@@ -92,6 +92,24 @@
         ctx.fillText(label, cx, cy + 1); ctx.textBaseline = 'alphabetic';
       }
     });
+    // technique connectors: slides, hammer-ons / pull-offs between two frets, bends up from a fret
+    const head = (x, y, dx, dy) => { const L = Math.hypot(dx, dy) || 1, ux = dx / L, uy = dy / L; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - ux * 8 - uy * 4, y - uy * 8 + ux * 4); ctx.lineTo(x - ux * 8 + uy * 4, y - uy * 8 - ux * 4); ctx.fill(); };
+    (o.links || []).forEach(l => {
+      if (l.f0 < (l.f0 === 0 ? 0 : f0) || l.f0 > f1) return;
+      const y = sy(l.s), x0 = mx(noteX(l.f0)), x1 = mx(noteX(Math.min(f1, Math.max(f0, l.f1))));
+      ctx.save(); ctx.strokeStyle = '#fff'; ctx.fillStyle = '#fff'; ctx.lineWidth = compact ? 1.5 : 2.2; ctx.lineCap = 'round';
+      if (l.kind === 'b') {
+        const tx = x0 + R * 1.5, ty = y - R * 1.9; ctx.beginPath(); ctx.moveTo(x0 + R * .7, y - R * .4); ctx.quadraticCurveTo(x0 + R * 1.7, y - R * .5, tx, ty); ctx.stroke(); head(tx, ty, -.2, -1);
+        if (l.label && !compact) { ctx.font = '700 11px system-ui'; ctx.textAlign = 'left'; ctx.fillText(l.label, tx + 6, ty + 4); }
+      } else if (l.kind === '/' || l.kind === '\\') {
+        const d = Math.sign(x1 - x0) || 1; if (Math.abs(x1 - x0) < R * 2.5) { ctx.restore(); return; }
+        ctx.beginPath(); ctx.moveTo(x0 + d * R * 1.1, y); ctx.lineTo(x1 - d * R * 1.2, y); ctx.stroke(); head(x1 - d * R * 1.1, y, d, 0);
+      } else if (l.kind === 'h' || l.kind === 'p') {
+        ctx.beginPath(); ctx.moveTo(x0, y - R * 1.1); ctx.quadraticCurveTo((x0 + x1) / 2, y - R * 2.6, x1, y - R * 1.1); ctx.stroke();
+        if (!compact) { ctx.font = '700 11px system-ui'; ctx.textAlign = 'center'; ctx.fillText(l.kind.toUpperCase(), (x0 + x1) / 2, y - R * 1.9); }
+      }
+      ctx.restore();
+    });
   }
 
   /** Pick a fret window that fits a set of frets, never narrower than `minSpan` frets. */

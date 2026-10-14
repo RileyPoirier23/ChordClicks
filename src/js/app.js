@@ -81,7 +81,7 @@
     }).join('\n');
   }
   function renderSongHeader() {
-    const s = song || {}, bits = [s.artist, s.genre, s.meta && s.meta.key && 'Key ' + s.meta.key, s.meta && s.meta.capo && 'Capo ' + s.meta.capo].filter(Boolean);
+    const s = song || {}, m = s.meta || {}, bits = [s.artist, s.genre, m.key && 'Key ' + m.key, m.capo && 'Capo ' + m.capo, m.tuning && !/standard/i.test(m.tuning) && m.tuning, s.bpm && s.bpm + ' bpm'].filter(Boolean);
     $('np-t').textContent = s.title || 'No song loaded'; $('np-s').textContent = bits.join(' · ') || 'Search Ultimate Guitar or open your library';
     $('sh-title').textContent = s.title ? s.title : 'Chord sheet';
     const qi = queue.ids.length ? queue.ids.indexOf(s.id) : -1;
@@ -239,13 +239,13 @@
   }
 
   /* ================================================================ navigation */
-  const views = ['practice', 'library', 'find', 'solo', 'scales', 'learn', 'tuner', 'gear', 'stream', 'settings'];
+  const views = ['practice', 'library', 'find', 'solo', 'scales', 'learn', 'tuner', 'gear', 'stream', 'support', 'settings'];
   function show(v) {
     if (v !== 'tuner') RCC.tuner.stop();
     document.querySelectorAll('.nav').forEach(b => b.classList.toggle('on', b.dataset.view === v));
     views.forEach(n => $('v-' + n).classList.toggle('on', n === v));
     if (v === 'library') renderLib(); if (v === 'scales') RCC.scales.redraw(); if (v === 'stream') renderStreamUI(); if (v === 'practice') showChord();
-    if (v === 'find') fillImportTargets(); if (v === 'learn') RCC.learn.redraw();
+    if (v === 'find') { fillImportTargets(); paintOnline(); setTimeout(() => $('ug-q').focus(), 50); } if (v === 'learn') RCC.learn.redraw();
   }
   document.querySelectorAll('.nav').forEach(b => b.onclick = () => show(b.dataset.view));
 
@@ -314,38 +314,70 @@
   function sugg() { const q = $('q').value.toLowerCase(); $('sugg').innerHTML = Store.lib.songs.filter(x => (x.title + ' ' + x.artist).toLowerCase().includes(q)).slice(0, 12).map(x => `<option value="${esc(x.title + ' — ' + x.artist)}">`).join(''); }
   Store.on(() => { if ($('v-library').classList.contains('on')) renderLib(); else { sugg(); fillImportTargets(); } renderAcct(); renderNewChords(); });
 
-  /* ================================================================ Ultimate Guitar */
-  const EXTRACT = `(()=>{try{const j=JSON.parse(document.querySelector('.js-store').dataset.content),d=j.store.page.data;const found=[];(function w(o,dp){if(!o||typeof o!=='object'||dp>12)return;for(const k of Object.keys(o)){if(/strum/i.test(k)&&o[k]&&typeof o[k]==='object')found.push(o[k]);w(o[k],dp+1)}})(j,0);
-   const tv=d.tab_view||{},m=tv.meta||{};return JSON.stringify({title:d.tab.song_name,artist:d.tab.artist_name,text:tv.wiki_tab.content,strum:found.slice(0,12),meta:{key:d.tab.tonality_name||'',capo:m.capo||tv.capo||''},url:location.href})}catch(e){const t=document.querySelector('pre');return t?JSON.stringify({title:document.title.split(' by ')[0]||'Untitled',artist:(document.title.split(' by ')[1]||'').split(' @')[0],text:t.innerText,strum:[],meta:{},url:location.href}):null}})()`;
+  /* ================================================================ Ultimate Guitar (own UI, nothing from the site is displayed) */
+  const UG = { q: '', type: 'chords', page: 1, results: [], more: false, sel: -1, cur: null, busy: false };
   function fillImportTargets() {
     $('genres').innerHTML = [...new Set([...Store.PRESET_GENRES, ...Store.genres().map(g => g.name)])].map(g => `<option value="${esc(g)}">`).join('');
     const cur = $('imp-pl').value; $('imp-pl').innerHTML = '<option value="">No playlist</option>' + Store.lib.playlists.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join(''); $('imp-pl').value = cur; $('imp-genre').value = $('imp-genre').value || P.impGenre || '';
   }
+  const ugErr = e => (e && e.message === 'offline') ? 'You’re offline — only saved songs are available' : 'Ultimate Guitar: ' + ((e && e.message) || 'something went wrong');
+  const stars = r => { const n = Math.max(0, Math.min(5, Math.round(r))); return '★'.repeat(n) + `<span style="opacity:.3">${'★'.repeat(5 - n)}</span>`; };
+  function ugRender() {
+    const box = $('ug-results');
+    if (UG.busy === 'search' && !UG.results.length) { box.innerHTML = `<div class="empty"><b>Searching…</b>${esc(UG.q)}</div>`; return; }
+    if (!UG.results.length) { box.innerHTML = `<div class="empty"><b>${UG.q ? 'No results' : 'Search Ultimate Guitar'}</b>${UG.q ? 'Try fewer words, or switch between Chords, Tabs and All.' : 'Type a song or artist above. Versions open here — no website, no ads.'}</div>`; return; }
+    box.innerHTML = UG.results.map((r, i) => `<div class="ugr ${i === UG.sel ? 'on' : ''}" data-i="${i}"><div class="grow" style="min-width:0"><b>${esc(r.title)}</b><div class="ar">${esc(r.artist)}${r.version > 1 ? ' · ver ' + r.version : ''}${r.key ? ' · ' + esc(r.key) : ''}</div></div><div class="rt"><span class="tag">${esc(r.type)}</span><div>${stars(r.rating)} <span>${r.votes ? r.votes.toLocaleString() : ''}</span></div></div></div>`).join('')
+      + (UG.more ? `<div class="row" style="justify-content:center;margin:10px 0 4px"><button class="btn sm" id="ug-more" ${UG.busy ? 'disabled' : ''}>${UG.busy ? 'Loading…' : 'More results'}</button></div>` : '');
+    box.querySelectorAll('.ugr').forEach(e => e.onclick = () => ugOpen(+e.dataset.i));
+    const m = $('ug-more'); if (m) m.onclick = () => ugSearch(UG.q, UG.page + 1);
+  }
+  async function ugSearch(q, pg = 1) {
+    q = String(q || '').trim(); if (!q) return;
+    if (!RCC.ug.online()) { toast('You’re offline — only saved songs are available'); return; }
+    UG.q = q; $('ug-q').value = q; UG.busy = 'search'; if (pg === 1) { UG.results = []; UG.sel = -1; UG.cur = null; $('ug-prev').innerHTML = '<div class="empty"><b>Nothing selected</b>Pick a result to preview it before you import.</div>'; } ugRender();
+    try { const r = await RCC.ug.search(q, { type: UG.type, page: pg }); if (UG.q !== q) return; UG.page = pg; UG.results = pg === 1 ? r.results : UG.results.concat(r.results); UG.more = r.more; }
+    catch (e) { toast(ugErr(e)); }
+    UG.busy = false; ugRender();
+    if (pg === 1 && UG.results.length && UG.sel < 0) ugOpen(0);
+  }
+  async function ugOpen(i) {
+    const r = UG.results[i]; if (!r) return; UG.sel = i; UG.cur = null; ugRender();
+    const box = $('ug-prev'); box.innerHTML = `<div class="empty"><b>Loading…</b>${esc(r.title)} — ${esc(r.artist)}</div>`;
+    try { const t = await RCC.ug.tab(r.url); if (UG.sel !== i) return; UG.cur = t; ugPreview(t); }
+    catch (e) { if (UG.sel !== i) return; box.innerHTML = `<div class="empty"><b>Couldn’t load that one</b>${esc(ugErr(e))}<div class="row" style="justify-content:center;margin-top:10px"><button class="btn sm" id="ug-ext">Open in your browser</button></div></div>`; $('ug-ext').onclick = () => window.open(r.url, '_blank'); }
+  }
+  function ugPreview(t) {
+    const box = $('ug-prev'), m = t.meta || {}, bits = [m.key && 'Key ' + m.key, m.capo && 'Capo ' + m.capo, m.tuning && 'Tuning ' + m.tuning, t.bpm && t.bpm + ' bpm', m.difficulty && String(m.difficulty)].filter(Boolean);
+    box.innerHTML = `<div class="ph"><div class="grow" style="min-width:0"><h2 class="ell">${esc(t.title)}</h2><div class="small ell">${esc(t.artist)}${bits.length ? ' · ' + bits.map(esc).join(' · ') : ''}</div></div><button class="btn p" id="ug-imp">Import this song</button><button class="btn sm" id="ug-ext" title="Open on ultimate-guitar.com in your browser">↗</button></div>
+      <div class="ug-meta">${t.chords.length ? `<span class="small">Chords</span>${t.chords.slice(0, 16).map(c => `<span class="tag">${esc(c)}</span>`).join('')}` : '<span class="small">No chord line found — it may be a tab-only page.</span>'}${t.strums.length ? `<span class="small" style="margin-left:6px">Strum</span>${t.strums.slice(0, 3).map(s => `<span class="tag ok" title="${esc(s.part || '')}">${esc((s.part ? s.part + ' ' : '') + s.pat)}</span>`).join('')}` : ''}</div>
+      <pre id="ug-text"></pre>`;
+    $('ug-text').innerHTML = renderSheetHTML(SG.parseSheet(t.text));
+    $('ug-imp').onclick = () => ugImport(t); $('ug-ext').onclick = () => window.open(t.url, '_blank');
+  }
+  function ugImport(x) {
+    const genre = $('imp-genre').value.trim(); P.impGenre = genre; saveP();
+    const saved = Store.addSong({ title: x.title, artist: x.artist, text: x.text, strums: x.strums || [], pat: '', bpm: x.bpm || 0, genre, meta: x.meta || {}, url: x.url });
+    const pid = $('imp-pl').value; if (pid && Store.playlist(pid) && !Store.playlist(pid).songIds.includes(saved.id)) Store.toggleInPlaylist(pid, saved.id);
+    const nTabs = SG.parseTabs(x.text).sections.length, ns = (x.strums || []).length, m = x.meta || {};
+    toast(`Imported “${x.title}”${ns ? ' · ' + ns + ' strumming pattern' + (ns > 1 ? 's' : '') : ''}${m.capo ? ' · capo ' + m.capo : ''}${m.tuning ? ' · ' + m.tuning : ''}${nTabs ? ' · ' + nTabs + ' tab section' + (nTabs > 1 ? 's' : '') : ''}`);
+    playList([saved.id], saved.id, pid ? Store.playlist(pid).name : '');
+  }
+  $('ug-go').onclick = () => ugSearch($('ug-q').value); $('ug-q').onkeydown = e => { if (e.key === 'Enter') ugSearch($('ug-q').value); };
+  document.querySelectorAll('#ug-type button').forEach(b => b.onclick = () => { UG.type = b.dataset.v; document.querySelectorAll('#ug-type button').forEach(x => x.classList.toggle('on', x === b)); if (UG.q) ugSearch(UG.q); });
+  $('find-off-lib').onclick = () => show('library');
   $('ug').onclick = () => {
     const v = $('q').value.trim(), hit = Store.lib.songs.find(x => (x.title + ' — ' + x.artist) === v);
     if (hit) { playList([hit.id], hit.id, ''); return; } if (!v) return;
-    show('find'); $('ugv').src = 'https://www.ultimate-guitar.com/search.php?search_type=title&value=' + encodeURIComponent(v);
+    if (!RCC.ug.online()) { selKey = 'all'; $('lib-q').value = v; show('library'); toast('You’re offline — showing saved songs that match'); return; }
+    show('find'); ugSearch(v);
   };
   $('q').onkeydown = e => { if (e.key === 'Enter') $('ug').click(); }; $('q').oninput = sugg;
-  $('ugh').onclick = () => { $('ugv').src = 'https://www.ultimate-guitar.com/'; };
-  $('ugback').onclick = () => { try { $('ugv').canGoBack() && $('ugv').goBack(); } catch (e) {} };
-  $('imp').onclick = async () => {
-    try {
-      const r = await $('ugv').executeJavaScript(EXTRACT); if (!r) throw 0; const x = JSON.parse(r);
-      let found = SG.extractStrumsFromJSON({ strum: x.strum || [] }); if (!found.length) found = SG.findStrumsInText(x.text);
-      const genre = $('imp-genre').value.trim(); P.impGenre = genre; saveP();
-      const saved = Store.addSong({ title: x.title, artist: x.artist, text: x.text, strums: found, pat: '', bpm: (found.find(f => f.bpm) || {}).bpm || 0, genre, meta: x.meta || {}, url: x.url });
-      const pid = $('imp-pl').value; if (pid && !Store.playlist(pid).songIds.includes(saved.id)) Store.toggleInPlaylist(pid, saved.id);
-      const nTabs = SG.parseTabs(x.text).sections.length;
-      toast(`Imported “${x.title}” · ${found.length ? found.length + ' strumming pattern' + (found.length > 1 ? 's' : '') : 'no strumming pattern found – set one on the Practice page'}${nTabs ? ' · ' + nTabs + ' tab section' + (nTabs > 1 ? 's' : '') : ''}`);
-      playList([saved.id], saved.id, pid ? Store.playlist(pid).name : '');
-    } catch (e) {
-      try { // not a UG page: take selected text, or the biggest <pre> / text block, from whatever site is open
-        const r = await $('ugv').executeJavaScript(`(()=>{try{let t=String(getSelection()||'').trim();if(t.length<30){const c=[...document.querySelectorAll('pre,textarea,.chords,.tab-content,[class*=lyrics],[class*=chord]')].map(e=>e.innerText||e.value||'').sort((a,b)=>b.length-a.length);t=(c[0]||'').trim()}return t.length>30?JSON.stringify({text:t,title:document.title.split(/[|\\-–—]/)[0].trim()}):null}catch(e){return null}})()`);
-        if (!r) throw 0; const x = JSON.parse(r); RCC.lib2.openImport({ title: x.title, text: x.text });
-      } catch (e2) { toast('Select the chord text on the page (or open a chords page), then Import'); }
-    }
-  };
+  /* ---- offline awareness: everything saved keeps working, only Ultimate Guitar needs a connection ---- */
+  function paintOnline() {
+    const on = RCC.ug.online(); document.body.classList.toggle('offline', !on); $('find-off').hidden = on; $('netpill').hidden = on;
+    $('q').placeholder = on ? 'Search Ultimate Guitar or your library' : 'Offline — search your saved songs';
+  }
+  window.addEventListener('online', () => { paintOnline(); toast('Back online'); }); window.addEventListener('offline', () => { paintOnline(); toast('You’re offline — your saved songs still work'); });
 
   /* ================================================================ camera + overlay + output */
   const cv = $('out'), cx = cv.getContext('2d', { willReadFrequently: true });
@@ -430,7 +462,9 @@
   $('autopat').onchange = e => { P.autopat = e.target.checked; saveP(); }; $('motion').onchange = e => { P.motion = e.target.checked; saveP(); applyLook(); };
   setInterval(() => { if (P.asr && !P.follow) $('sheet').scrollTop += P.asr * .15; }, 30);
   $('exp').onclick = async () => { const r = await Store.exportLib(); if (r && r.ok) toast('Songs exported'); };
-  $('imp-lib').onclick = async () => { if (!R) return toast('Import needs the desktop app'); const r = await R.lib.importFrom(); if (r.ok) { const n = Store.mergeLib(r.lib); toast('Imported ' + n + ' new song' + (n === 1 ? '' : 's')); } else if (r.error) toast(r.error); };
+  $('imp-lib').onclick = async () => {
+    if (!R) { const f = document.createElement('input'); f.type = 'file'; f.accept = '.json,application/json'; f.onchange = async () => { try { const n = Store.mergeLib(JSON.parse(await f.files[0].text())); toast('Imported ' + n + ' new song' + (n === 1 ? '' : 's')); } catch (e) { toast('That file is not a valid song export.'); } }; f.click(); return; }
+    const r = await R.lib.importFrom(); if (r.ok) { const n = Store.mergeLib(r.lib); toast('Imported ' + n + ' new song' + (n === 1 ? '' : 's')); } else if (r.error) toast(r.error); };
 
   /* ================================================================ accounts */
   function renderAcct() {
@@ -487,12 +521,15 @@
     $('ramp').checked = TR.ramp; $('rampset').style.display = TR.ramp ? '' : 'none'; $('rampstart').value = TR.rampStart; $('rampstart-v').textContent = TR.rampStart + '%'; if (TR.ramp) TR.speed = TR.rampStart; $('accpat').value = TR.acc; $('flash').checked = TR.flash; $('silent').checked = TR.silent; $('sil-play').value = TR.silPlay; $('sil-mute').value = TR.silMute; $('backing').checked = TR.backing; $('bstyle').value = TR.bstyle; $('bvol').value = TR.bvol; $('bcomp').checked = TR.bcomp; paintSpeed();
     RCC.solo.init({ track: o => Store.track(o), songTitle: () => (song && song.title) || '', result: r => Store.track({ drill: 'solo-' + r.mode, score: { key: r.key, v: Math.round(r.acc) } }), audio, bpm: { get: () => P.bpm, set: setBpm }, toast, accent: () => P.accent, click: acc => clickAt(audio().currentTime + .01, acc, false), saveTab: t => { if (song) { song.soloTab = t; if (song.id) Store.updateSong(song.id, { soloTab: t }); RCC.solo.setSong(song); toast('Tab saved to this song'); } } });
     RCC.tuner.init({ audio, toast });
-    RCC.learn.init({ toast, audio, accent: () => P.accent, jam: (text, title) => { loadSong(tempSong(title, text, { artist: 'Theory lesson' })); show('practice'); }, useChord: n => { loadSong(tempSong(n, '[Chord]\n' + n, { artist: 'Chord library' })); show('practice'); }, track: o => Store.track(o), bpm: () => P.bpm });
+    RCC.learn.init({ toast, audio, accent: () => P.accent, jam: (text, title) => { loadSong(tempSong(title, text, { artist: 'Theory lesson' })); show('practice'); }, useChord: n => { loadSong(tempSong(n, '[Chord]\n' + n, { artist: 'Chord library' })); show('practice'); }, track: o => Store.track(o), bpm: () => P.bpm, drill: (text, name) => { if (RCC.solo.openTab(text, name)) show('solo'); } });
     RCC.gear.init({ toast, bpm: () => P.bpm, beats: () => +$('beats').value });
     RCC.scales.init({ audio, toast, track: o => Store.track(o), drill: (text, name) => { if (RCC.solo.openTab(text, name)) show('solo'); }, accent: () => P.accent, jam: (text, title) => { loadSong(tempSong(title, text, { artist: 'Scale Lab' })); show('practice'); } });
     await Store.init(); RCC.controls.init();
     renderAcct(); renderLib(); renderStreamUI();
-    if (R) R.version().then(v => { $('ver').textContent = 'v' + v; });
+    if (R) R.version().then(v => { $('ver').textContent = $('ver2').textContent = 'v' + v; });
+    paintOnline();
+    $('sup-share').onclick = async () => { const url = 'https://www.506clicks.ca/projects/chordclicks/', text = 'ChordClicks — free guitar practice app with your chords on camera'; try { if (navigator.share) await navigator.share({ title: 'ChordClicks', text, url }); else { await navigator.clipboard.writeText(url); toast('Link copied — thanks for sharing!'); } } catch (e) {} };
+    if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => {});
     loadSong(tempSong('Sample', '[Verse]\nAm        F\nPaste a song from Ultimate Guitar here\nC         G\nand the chords show up on your camera'));
     song.title = ''; renderSongHeader();
     startCam();
@@ -502,5 +539,5 @@
     applyText(); renderSongHeader();
   }
   RCC.app = { get song() { return song; }, get prog() { return prog; }, get pi() { return pi; }, get sheet() { return sheet; }, get running() { return running; }, loadSong, show, toast, dialog, closeDlg, askText, askConfirm, menu, esc, P, saveP, Store, setBpm, nav, setPi, toggle, playList, renderLib, tempSong, replaceText, applyText, setMode, renderStreamUI, TR };
-  window.__rcc = { EXTRACT, loadSong, show, get song() { return song; }, tempSong, P };
+  window.__rcc = { loadSong, show, get song() { return song; }, tempSong, P, ugSearch, UG };
 })();

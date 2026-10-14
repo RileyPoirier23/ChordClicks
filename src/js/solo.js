@@ -38,9 +38,15 @@
     stop(); sec = secs[i] || null; pos = 0; cur = -1;
     $('soloempty').hidden = !!sec; $('solo-sel').value = String(i);
     $('solo-scrub').value = 0; $('solo-time').textContent = '0:00';
-    if (sec) { sec._win = RCC.fret.windowFor(sec.minFret, sec.maxFret, 12); calcEdges(); }
+    if (sec) { sec._win = RCC.fret.windowFor(sec.minFret, sec.maxFret, 12); calcEdges(); linkTargets(sec); }
     resetScore(); fillRange();
   }
+  /** For every slide / hammer / pull, remember which later event holds the destination note (for drawing the connector). */
+  function linkTargets(sc) {
+    const ev = sc.events;
+    ev.forEach((e, i) => e.notes.forEach(n => { delete n.toIdx; if (!n.to) return; for (let j = i + 1; j < Math.min(ev.length, i + 4); j++) if (ev[j].notes.some(m => m.s === n.s && m.fret === n.to.fret)) { n.toIdx = j; break; } }));
+  }
+  const BEND_LABEL = b => b >= 4 ? '2' : b === 3 ? '1½' : b === 2 ? 'full' : b === 1 ? '½' : '¼';
   function calcEdges() {
     const tb = totalBeats(), b = (sec.bars || []).map(c => c / sec.colsPerBeat).filter(x => x > .01 && x < tb - .01);
     edges = [...new Set([0, ...b.map(x => +x.toFixed(3)), +tb.toFixed(3)])].sort((x, y) => x - y); st.from = 0; st.to = -1;
@@ -92,7 +98,7 @@
     const pa = pos - st.lat / 1000 / secPerBeat(), ev = sec.events, fresh = performance.now() - heard.at < 220 && heard.n >= 2;
     for (let i = Math.max(0, cur - 6); i < ev.length; i++) {
       const e = ev[i], t = beatOf(e); if (t - pa > WIN + .05) break; if (e.st) continue;
-      if (fresh && Math.abs(pa - t) <= WIN + (st.mode === 'wait' ? 99 : 0) && e.notes.some(n => NOTE_PC(n) === heard.pc)) {
+      if (fresh && Math.abs(pa - t) <= WIN + (st.mode === 'wait' ? 99 : 0) && e.notes.some(n => NOTE_PC(n) === heard.pc || (n.bend && (NOTE_PC(n) + n.bend) % 12 === heard.pc))) {
         e.st = 'hit'; sc.hits++; sc.combo++; sc.best = Math.max(sc.best, sc.combo); sc.pts += 100 * (1 + Math.min(sc.combo, 20) / 10) * (1 - Math.abs(pa - t) / (WIN * 2)) | 0; flash.push({ e, t0: performance.now() });
         if (waiting && i >= cur) { waiting = false; } heard.n = 0; break;
       }
@@ -135,13 +141,14 @@
   function fretState(compact) {
     if (!sec) return null;
     const ev = sec.events, notes = [];
-    const add = (e, kind, prog) => e && e.notes.forEach(n => notes.push({ s: n.s, fret: n.fret, kind, prog }));
+    const links = [];
+    const add = (e, kind, prog) => e && e.notes.forEach(n => { notes.push({ s: n.s, fret: n.fret, kind, prog }); if (kind === 'cur' || kind === 'next') { if (n.to) links.push({ s: n.s, f0: n.fret, f1: n.to.fret, kind: n.to.tech }); if (n.bend) links.push({ s: n.s, f0: n.fret, f1: n.fret, kind: 'b', label: BEND_LABEL(n.bend) }); } });
     const c = ev[cur], n1 = ev[cur + 1];
     if (c && pos - beatOf(c) < 1.2) add(c, 'cur');
     if (waiting && !c) { const w = nextPending(); if (w) add(w, 'cur'); }
     if (n1) add(n1, 'next', 1 - Math.max(0, Math.min(1, (beatOf(n1) - pos) / LOOK)));
     if (!compact) { add(ev[cur + 2], 'later'); add(ev[cur + 3], 'later'); }
-    return { f0: sec._win[0], f1: sec._win[1], notes, lefty: st.lefty };
+    return { f0: sec._win[0], f1: sec._win[1], notes, links, lefty: st.lefty };
   }
 
   /* ---- drawing ---- */
@@ -184,8 +191,23 @@
         c.fillStyle = miss ? '#6b7280' : hit ? '#34d399' : col; c.beginPath(); c.roundRect(x - gw / 2, y - gh / 2, gw * (hit ? 1 + Math.max(0, .5 - d) * .6 : 1), gh, 10); c.fill(); c.shadowBlur = 0;
         c.strokeStyle = 'rgba(255,255,255,.75)'; c.lineWidth = hot ? 3 : 1.5; c.stroke();
         c.fillStyle = '#0b0b12'; c.font = '800 ' + Math.round(gh * .55) + 'px system-ui,sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
-        c.fillText(n.fret + (n.tech && 'hp/\\~b'.includes(n.tech) ? '' : ''), x, y + 1);
-        if (n.tech) { c.font = '700 11px system-ui'; c.fillStyle = '#fff'; c.fillText(n.tech === '\\' ? '↘' : n.tech === '/' ? '↗' : n.tech, x, y - gh / 2 - 7); }
+        c.fillText(n.fret, x, y + 1);
+        c.textBaseline = 'alphabetic';
+        // techniques: bend (curved arrow up + amount), slide / hammer / pull (connector to the destination note), vibrato (wave)
+        if (n.bend) {
+          const x0 = x + gw / 2 - 2, top = y - lane * .62; c.strokeStyle = '#fff'; c.lineWidth = 2; c.beginPath(); c.moveTo(x0, y - 3); c.quadraticCurveTo(x0 + 18, y - 6, x0 + 18, top + 6); c.stroke();
+          c.fillStyle = '#fff'; c.beginPath(); c.moveTo(x0 + 18, top); c.lineTo(x0 + 13, top + 9); c.lineTo(x0 + 23, top + 9); c.fill();
+          c.font = '700 10px system-ui'; c.textAlign = 'left'; c.fillText(BEND_LABEL(n.bend), x0 + 26, top + 8);
+          if (n.release != null) { c.setLineDash([3, 3]); c.beginPath(); c.moveTo(x0 + 24, top + 4); c.quadraticCurveTo(x0 + 42, top + 4, x0 + 44, y - 4); c.stroke(); c.setLineDash([]); }
+        }
+        if (n.to && n.toIdx != null && sec.events[n.toIdx]) {
+          const xt = X(beatOf(sec.events[n.toIdx])), up = n.to.fret > n.fret, t = n.to.tech;
+          c.strokeStyle = 'rgba(255,255,255,.85)'; c.lineWidth = 2;
+          if (t === '/' || t === '\\') { c.beginPath(); c.moveTo(x + gw / 2, y + (up ? gh * .3 : -gh * .3)); c.lineTo(xt - gw / 2, y + (up ? -gh * .3 : gh * .3)); c.stroke(); }
+          else { c.beginPath(); c.moveTo(x, y - gh / 2 - 2); c.quadraticCurveTo((x + xt) / 2, y - gh / 2 - lane * .7, xt, y - gh / 2 - 2); c.stroke(); c.fillStyle = '#fff'; c.font = '700 11px system-ui'; c.textAlign = 'center'; c.fillText(t === 'h' ? 'H' : 'P', (x + xt) / 2, y - gh / 2 - lane * .36); }
+        }
+        if (n.tech === '~') { c.strokeStyle = 'rgba(255,255,255,.8)'; c.lineWidth = 1.5; c.beginPath(); for (let k = 0; k <= 16; k++) { const px = x + gw / 2 + 3 + k * 2, py = y - gh / 2 - 7 + Math.sin(k * 1.2) * 3; k ? c.lineTo(px, py) : c.moveTo(px, py); } c.stroke(); }
+        else if (n.tech === 'h' || n.tech === 'p' || n.tech === '/' || n.tech === '\\') { /* shown by the connector from the previous note */ }
         c.restore(); c.textBaseline = 'alphabetic';
       });
     });

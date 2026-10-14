@@ -39,8 +39,26 @@
     return { freq: sr / (tau + shift), prob: 1 - cm[tau], rms: level };
   }
 
+  /**
+   * Refine a period estimate by measuring it over several periods at once (normalised autocorrelation
+   * at k*tau with parabolic interpolation). Cents precision improves roughly k-fold, which is what makes
+   * the needle sit still instead of twitching.
+   */
+  function refine(buf, tau0) {
+    const N = buf.length; if (!(tau0 > 2)) return tau0;
+    const k = Math.max(1, Math.min(8, Math.floor((N / 2) / tau0)));
+    const lag0 = tau0 * k, W = Math.floor(N - lag0 - 3); if (k < 2 || W < tau0 * 2) return tau0;
+    const corr = lag => { let s = 0, e1 = 0, e2 = 0; for (let j = 0; j < W; j++) { const a = buf[j], b = buf[j + lag]; s += a * b; e1 += a * a; e2 += b * b; } return s / Math.sqrt(e1 * e2 + 1e-12); };
+    const vals = new Map(); let best = -Infinity, bl = Math.round(lag0);
+    for (let lag = Math.max(1, Math.floor(lag0 - 2)); lag <= Math.ceil(lag0 + 2); lag++) { const v = corr(lag); vals.set(lag, v); if (v > best) { best = v; bl = lag; } }
+    if (best < .5) return tau0;
+    const a = vals.has(bl - 1) ? vals.get(bl - 1) : corr(bl - 1), b = vals.get(bl), c = vals.has(bl + 1) ? vals.get(bl + 1) : corr(bl + 1), den = a + c - 2 * b, shift = den ? (a - c) / (2 * den) : 0;
+    const t = (bl + shift) / k;
+    return Math.abs(1200 * Math.log2(t / tau0)) < 60 ? t : tau0;
+  }
+
   /** Median of recent readings, ignoring outliers (octave jumps). */
   function median(arr) { const s = [...arr].sort((x, y) => x - y); return s[Math.floor(s.length / 2)]; }
 
-  return { yin, rms, median };
+  return { yin, rms, median, refine };
 });

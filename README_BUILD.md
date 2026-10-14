@@ -9,8 +9,10 @@ chordclicks/
 ├── src/
 │   ├── styles.css
 │   ├── lib/  theory song pitch chroma sync requests      (pure logic, unit-tested in node)
-│   └── js/   app store overlay fretboard solo scales tuner
-│             audio gear backing chords learn library2 controls
+│   └── js/   app store ug overlay fretboard solo scales tuner fingerpick
+│             audio capture-worklet gear backing chords learn library2 controls
+├── manifest.webmanifest  sw.js   (installable web app, offline cache)
+├── capacitor.config.json android/ ios/   (phone apps; `npm run web` fills www/)
 ├── server/server.js      (optional cloud-sync server, zero dependencies)
 ├── scripts/vcam.py       (RGBA frames + binary stdin)
 ├── build/                icon / installer artwork / installer.nsh
@@ -39,6 +41,16 @@ synthetic microphone input.
 | Chord diagrams in every overlay layout, Stage (karaoke) layout, scenes, chat requests | Stream view |
 | Difficulty rating, "songs I can play", transpose/capo, import, set notes + PDF | Library view / Key-Capo button |
 | Hotkeys, global hotkeys, MIDI foot pedal, cloud sync | Settings view |
+| Ultimate Guitar search / preview / import (`ug:fetch` IPC on desktop, native HTTP on phones, hidden webview fallback) | Find view (`ug.js`) |
+| Fingerpicking patterns, tab generator for Solo | Learn view (`fingerpick.js`) |
+| Looper capture on the audio thread | `capture-worklet.js` (+ ScriptProcessor fallback) |
+| Offline: online/offline events, service worker, saved songs only | `app.js` paintOnline, `sw.js` |
+
+## Phone apps (Capacitor)
+`npm run web` copies the app into `www/`; `npx cap sync` pushes it into `android/` and `ios/`. Open those with
+Android Studio / Xcode to run on a device or build a store package. `CapacitorHttp` is enabled so `fetch()` to
+Ultimate Guitar goes through native HTTP (no CORS). Mic and camera permissions are declared in the manifest / Info.plist.
+The UI switches to a bottom tab bar and single-column layout under 820px wide.
 
 ## Cloud sync (optional)
 Run `node server/server.js` on any machine you control (`PORT=8787`, data in `server-data/`). Put it behind

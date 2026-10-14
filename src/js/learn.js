@@ -169,13 +169,14 @@
 
   /* ================================================================ shell */
   function show(t) {
-    tab = t; if (stopChange) stopChange();
+    tab = t; if (stopChange) stopChange(); if (t !== 'finger' && RCC.fingerpick) RCC.fingerpick.stop();
     document.querySelectorAll('#ln-tabs button').forEach(b => b.classList.toggle('on', b.dataset.t === t)); document.querySelectorAll('.ln-pane').forEach(p => p.classList.toggle('on', p.id === 'ln-' + t));
-    if (t === 'chords') RCC.chords.redraw(); else if (t === 'changes' && !(cc.run && !cc.run.done)) changesUI(); else if (t === 'ear') earUI(); else if (t === 'theory') theoryUI(); else if (t === 'progress') progressUI();
+    if (t === 'chords') RCC.chords.redraw(); else if (t === 'changes' && !(cc.run && !cc.run.done)) changesUI(); else if (t === 'ear') earUI(); else if (t === 'finger') RCC.fingerpick.redraw(); else if (t === 'theory') theoryUI(); else if (t === 'progress') progressUI();
   }
   function init(deps) {
     D = deps; D.jam = deps.jam; document.querySelectorAll('#ln-tabs button').forEach(b => b.onclick = () => show(b.dataset.t));
     RCC.chords.build($('ln-chords'), { accent: D.accent, useChord: n => D.useChord && D.useChord(n) });
+    if (RCC.fingerpick) RCC.fingerpick.init(D);
   }
   RCC.learn = { init, show, redraw: () => show(tab), setDeps: o => Object.assign(D, o), openChord: n => { RCC.chords.select(n); show('chords'); } };
 })();

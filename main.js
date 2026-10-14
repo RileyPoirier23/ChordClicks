@@ -67,6 +67,16 @@ ipcMain.handle('lib:import', async () => {
   try { return { ok: true, lib: JSON.parse(fs.readFileSync(r.filePaths[0], 'utf8')) }; } catch (err) { return { ok: false, error: 'That file is not a valid song export.' }; }
 });
 ipcMain.handle('app:version', () => app.getVersion());
+// Ultimate Guitar pages are fetched here (no CORS, no ads, nothing rendered) and parsed in the renderer.
+const UG_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36';
+ipcMain.handle('ug:fetch', async (e, url) => {
+  let u; try { u = new URL(String(url)); } catch (err) { return { ok: false, error: 'Bad address' }; }
+  if (u.protocol !== 'https:' || !/(^|\.)ultimate-guitar\.com$/.test(u.hostname)) return { ok: false, error: 'Only Ultimate Guitar pages can be fetched' };
+  try {
+    const r = await fetch(u.href, { headers: { 'user-agent': UG_UA, accept: 'text/html,application/xhtml+xml', 'accept-language': 'en-US,en;q=0.9' }, redirect: 'follow', signal: AbortSignal.timeout(20000) });
+    const html = await r.text(); return { ok: r.ok, status: r.status, html };
+  } catch (err) { return { ok: false, error: /abort|timeout/i.test(String(err)) ? 'Ultimate Guitar took too long to answer' : 'No connection to Ultimate Guitar' }; }
+});
 
 /* ---------------------------------------------------------------- recordings, PDF, global hotkeys, cloud sync */
 ipcMain.handle('rec:save', async (e, { name, data }) => {

@@ -1,9 +1,13 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob: mediastream:; connect-src 'self' wss://irc-ws.chat.twitch.tv; frame-src https:; worker-src 'self' blob:; script-src 'self'">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob: mediastream:; connect-src 'self' wss://irc-ws.chat.twitch.tv https://www.ultimate-guitar.com https://tabs.ultimate-guitar.com; frame-src https:; worker-src 'self' blob:; script-src 'self' blob:">
 <title>ChordClicks</title>
 <link rel="stylesheet" href="src/styles.css">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#09090f">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="build/icon.png">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
@@ -26,6 +30,7 @@
   <button class="nav" data-view="tuner"><svg viewBox="0 0 24 24"><path d="M4 18a9 9 0 1 1 16 0"/><path d="m12 14 4-5"/><circle cx="12" cy="15" r="1"/></svg><span>Tuner</span></button>
   <button class="nav" data-view="gear"><svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"/><circle cx="12" cy="9" r="2.5"/><circle cx="12" cy="16" r="1.2"/></svg><span>Gear</span></button>
   <button class="nav" data-view="stream"><svg viewBox="0 0 24 24"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="m22 8-6 4 6 4z"/></svg><span>Stream</span></button>
+  <button class="nav" data-view="support"><svg viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg><span>Support</span></button>
   <button class="nav" data-view="settings"><svg viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h2M10 12h10M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="8" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg><span>Settings</span></button>
   <div class="spacer"></div>
   <button id="acct" class="guest" title="Sign in or create an account"><span id="acctI">?</span><span id="acctN">Guest</span></button>
@@ -39,7 +44,7 @@
     <button class="btn p sm" id="ug">Search</button></label>
    <button class="btn" id="recb" title="Record camera + overlay + audio">● Rec</button><button class="btn" id="pipb" title="Floating preview window">Float</button>
    <button class="btn" id="cleanb" title="Fullscreen output only (Esc to exit)">Clean</button>
-   <span id="vstat" class="pill">Virtual cam off</span>
+   <span id="netpill" class="pill off" hidden>Offline · saved songs only</span><span id="vstat" class="pill">Virtual cam off</span>
   </header>
 
   <div id="views">
@@ -114,16 +119,23 @@
     </div>
    </section>
 
-   <!-- ============ FIND (Ultimate Guitar) ============ -->
+   <!-- ============ FIND (Ultimate Guitar, own UI) ============ -->
    <section class="view" id="v-find">
     <div class="card findbar">
-     <button class="btn" id="ugback">← Back</button><button class="btn" id="ugh">UG home</button><span class="grow"></span>
+     <label class="search grow"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      <input id="ug-q" autocomplete="off" placeholder="Song or artist on Ultimate Guitar"><button class="btn p sm" id="ug-go">Search</button></label>
+     <div class="seg sm" id="ug-type"><button data-v="chords" class="on">Chords</button><button data-v="tabs">Tabs</button><button data-v="all">All</button></div>
      <span class="small">Save to</span>
-     <input id="imp-genre" list="genres" placeholder="Genre (e.g. Rock)" style="width:150px"><datalist id="genres"></datalist>
+     <input id="imp-genre" list="genres" placeholder="Genre" style="width:120px"><datalist id="genres"></datalist>
      <select id="imp-pl"></select>
-     <button class="btn" id="imp-paste" title="Paste text from any website">Paste instead…</button><button class="btn p" id="imp">Import this song</button>
+     <button class="btn sm" id="imp-paste" title="Paste text from any website or file">Paste instead…</button>
     </div>
-    <div class="card webwrap"><webview id="ugv" src="https://www.ultimate-guitar.com/" partition="persist:ug" allowpopups></webview></div>
+    <div class="card hint" id="find-off" hidden><b>You’re offline.</b> Ultimate Guitar needs a connection. Everything you’ve already imported is in your <u id="find-off-lib" style="cursor:pointer">Library</u> and works without Wi-Fi.</div>
+    <div class="find-body">
+     <div class="card ug-list" id="ug-results"><div class="empty"><b>Search Ultimate Guitar</b>Type a song or artist above. Versions open here — no website, no ads. Chords, key, capo, tuning, tempo and strumming come along.</div></div>
+     <div class="card ug-prev" id="ug-prev"><div class="empty"><b>Nothing selected</b>Pick a result to preview it before you import.</div></div>
+    </div>
+    <webview id="ugv" src="about:blank" partition="persist:ug"></webview>
    </section>
 
    <!-- ============ SOLO ============ -->
@@ -184,10 +196,11 @@
 
    <!-- ============ LEARN ============ -->
    <section class="view" id="v-learn">
-    <div class="seg wide" id="ln-tabs"><button data-t="chords" class="on">Chord library</button><button data-t="changes">Chord changes</button><button data-t="ear">Ear training</button><button data-t="theory">Theory</button><button data-t="progress">Progress</button></div>
+    <div class="seg wide" id="ln-tabs"><button data-t="chords" class="on">Chord library</button><button data-t="changes">Chord changes</button><button data-t="ear">Ear training</button><button data-t="finger">Fingerpicking</button><button data-t="theory">Theory</button><button data-t="progress">Progress</button></div>
     <div class="ln-pane on" id="ln-chords"></div>
     <div class="ln-pane" id="ln-changes"></div>
     <div class="ln-pane" id="ln-ear"></div>
+    <div class="ln-pane" id="ln-finger"></div>
     <div class="ln-pane" id="ln-theory"></div>
     <div class="ln-pane" id="ln-progress"></div>
    </section>
@@ -242,7 +255,7 @@
        <div class="row"><label class="l">Length</label><select id="lp-bars"><option value="0">Free (tap Finish)</option><option value="1">1 bar</option><option value="2">2 bars</option><option value="4" selected>4 bars</option><option value="8">8 bars</option></select>
         <label class="tg"><span class="sw"><input type="checkbox" id="lp-count" checked><i></i></span>Count-in</label>
         <label class="l" title="Shift recorded audio earlier to cancel your sound card's delay">Latency fix</label><input type="number" id="lp-comp" value="0" min="0" max="300" style="width:70px"><span class="small">ms</span></div>
-       <div class="small">Tempo and beats come from the Practice metronome. Loops are recorded after the pedals and amp, so overdubs keep your tone.</div>
+       <div class="small">Tempo and beats come from the Practice metronome. Loops are captured on the audio thread, sample-accurate, after the pedals and amp — so overdubs keep your tone and the seam stays tight. Turn on <b>Monitor</b> (with headphones) to hear yourself while recording.</div>
        <div id="lp-layers"></div></div></div></div>
     <div class="g-pane" id="gp-rec"><div class="card pad">
       <div class="row"><button class="btn p big" id="rc-btn">● Start recording</button><b id="rc-time" style="font-variant-numeric:tabular-nums;font-size:20px">0:00</b></div>
@@ -280,6 +293,34 @@
     </div>
    </section>
 
+   <!-- ============ SUPPORT THE CREATOR ============ -->
+   <section class="view" id="v-support">
+    <div class="stack">
+     <div class="card sup-hero"><svg class="logo" viewBox="0 0 64 64"><use href="#logo"/></svg>
+      <h2>Support the creator</h2>
+      <p>ChordClicks is free and made by one person after hours. If it helps your playing, the best support is simple: share it with a guitarist, follow along, and say hi.</p>
+      <div class="row"><button class="btn p" id="sup-share">Share ChordClicks</button><a class="btn" href="https://www.506clicks.ca/projects/chordclicks/" target="_blank" rel="noreferrer">506clicks.ca</a><a class="btn" href="https://github.com/RileyPoirier23/chordclicks/issues" target="_blank" rel="noreferrer">Report a bug / request a feature</a></div>
+     </div>
+     <div class="card"><h4>Created by</h4>
+      <div class="sup-who"><b>Riley “Monkey Man” Poirier</b><span class="small">506Clicks · Moncton, New Brunswick</span></div>
+      <div class="sup-links">
+       <a href="https://instagram.com/rpoirier07" target="_blank" rel="noreferrer"><span class="tag">Instagram</span> rpoirier07</a>
+       <a href="https://instagram.com/506Clicks" target="_blank" rel="noreferrer"><span class="tag">Instagram</span> 506clicks</a>
+       <a href="https://www.tiktok.com/@iheartgrannies69" target="_blank" rel="noreferrer"><span class="tag">TikTok</span> iheartgrannies69</a>
+       <span><span class="tag">Discord</span> gldmonkey</span>
+       <a href="mailto:support@506clicks.ca"><span class="tag">Email</span> support@506clicks.ca</a>
+       <a href="https://www.506clicks.ca" target="_blank" rel="noreferrer"><span class="tag">Web</span> 506clicks.ca</a>
+      </div></div>
+    </div>
+    <div class="stack">
+     <div class="card"><h4>More from 506Clicks</h4>
+      <div class="sup-item"><b>CAGE BOSS</b><span class="small">Run an MMA promotion, or fight your way up as a fighter. Free for Windows, Mac, Linux and in the browser.</span><a class="btn sm" href="https://www.506clicks.ca/projects/cage-boss/" target="_blank" rel="noreferrer">Play CAGE BOSS</a></div>
+      <div class="sup-item"><b>Websites, apps and ad creative</b><span class="small">506Clicks builds websites for local businesses. Hiring the studio is the most direct way to keep projects like this one free.</span><a class="btn sm" href="https://www.506clicks.ca/services/" target="_blank" rel="noreferrer">See services</a></div>
+     </div>
+     <div class="card"><h4>Thank you</h4><div class="small">Every song imported, every solo scored and every stream with the overlay on means a lot. Keep playing.</div><div class="small" style="margin-top:8px">ChordClicks <span id="ver2"></span> · © 506Clicks</div></div>
+    </div>
+   </section>
+
    <!-- ============ SETTINGS ============ -->
    <section class="view" id="v-settings">
     <div class="stack">
@@ -313,6 +354,7 @@
 <script src="src/lib/requests.js"></script>
 <script src="src/js/audio.js"></script>
 <script src="src/js/store.js"></script>
+<script src="src/js/ug.js"></script>
 <script src="src/js/fretboard.js"></script>
 <script src="src/js/overlay.js"></script>
 <script src="src/js/solo.js"></script>
@@ -322,6 +364,7 @@
 <script src="src/js/chords.js"></script>
 <script src="src/js/library2.js"></script>
 <script src="src/js/controls.js"></script>
+<script src="src/js/fingerpick.js"></script>
 <script src="src/js/learn.js"></script>
 <script src="src/js/scales.js"></script>
 <script src="src/js/app.js"></script>
