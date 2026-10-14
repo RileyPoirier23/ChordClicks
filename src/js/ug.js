@@ -19,7 +19,9 @@
 
   async function fetchHtml(url) {
     if (R && R.ug) { const r = await R.ug.fetch(url); if (!r || !r.ok) throw new Error(r && r.error || 'Could not reach Ultimate Guitar'); return r.html; }
-    const r = await fetch(url, { credentials: 'omit', headers: { accept: 'text/html' } }); if (!r.ok) throw new Error('HTTP ' + r.status); return r.text();
+    const native = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+    try { const r = await fetch(url, { credentials: 'omit', headers: { accept: 'text/html' } }); if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); }
+    catch (e) { if (native) throw e; throw new Error('the browser version can’t load Ultimate Guitar pages directly. Use “Paste instead…”, or the desktop / phone app'); }
   }
   /** Fallback: let the hidden webview render the page (handles bot checks) and read the same store. */
   function viaWebview(url) {
