@@ -4,11 +4,12 @@
   const $ = id => document.getElementById(id), root = document.documentElement;
   const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
   const DEFAULT_PAT = 'D-DU-UDU';
-  const ACCENTS = ['#8b5cf6', '#ec4899', '#38bdf8', '#34d399', '#fbbf24', '#fb923c', '#f87171'];
+  const ACCENTS = ['#c8102e', '#e0a100', '#2f80ed', '#1f9d55', '#ff6b35', '#f3f0e8', '#8b5cf6'];
 
   /* ================================================================ settings */
-  const P = Object.assign({ accent: '#8b5cf6', fs: 17, asr: 0, mir: false, bpm: 90, beats: 4, sub: 2, vol: .7, autoc: true, follow: true, autopat: true, motion: true, impGenre: '' },
+  const P = Object.assign({ accent: '#c8102e', fs: 17, asr: 0, mir: false, bpm: 90, beats: 4, sub: 2, vol: .7, autoc: true, follow: true, autopat: true, motion: false, impGenre: '' },
     (() => { try { return JSON.parse(localStorage.getItem('rcc2') || '{}'); } catch (e) { return {}; } })());
+  if (P.accent === '#8b5cf6' && !P.look2) { P.accent = '#c8102e'; P.motion = false; } P.look2 = true;   // one-time move to the 3.2 look
   P.ov = Object.assign({}, OV.DEFAULTS, P.ov || {}); P.ov.show = Object.assign({}, OV.DEFAULTS.show, (P.ov || {}).show || {});
   const saveP = () => { try { localStorage.setItem('rcc2', JSON.stringify(P)); } catch (e) {} };
 
@@ -389,10 +390,19 @@
   }
   async function listCams() { try { const d = (await navigator.mediaDevices.enumerateDevices()).filter(x => x.kind === 'videoinput'); $('camsel').innerHTML = d.map((x, i) => `<option value="${x.deviceId}">${esc(x.label || 'Camera ' + (i + 1))}</option>`).join('') || '<option>No camera found</option>'; if (d.some(x => x.deviceId === camId)) $('camsel').value = camId; } catch (e) {} }
   async function startCam() {
-    try { if (stream) stream.getTracks().forEach(t => t.stop()); const v = { width: { ideal: 1280 }, height: { ideal: 720 } }; if (facing) v.facingMode = { ideal: facing }; else if (camId) v.deviceId = { exact: camId };
+    const v = { width: { ideal: 1280 }, height: { ideal: 720 } }; if (facing) v.facingMode = { ideal: facing }; else if (camId) v.deviceId = { exact: camId };
+    const In = RCC.audio.input;
+    if (In.combined) { // iPhone / iPad: camera and mic share one capture (see audio.js)
+      In.onVideo = st => { $('cam').srcObject = st; if (st) { $('cam').play().catch(() => {}); const t = st.getVideoTracks()[0]; camId = (t && t.getSettings().deviceId) || camId; listCams(); } };
+      try { await In.setVideo(v); if (In._videoFailed) { const e = In._videoFailed; In._videoFailed = null; throw e; } } catch (e) { if (camId || facing) { camId = ''; facing = ''; return startCam(); } toast('Camera unavailable (' + (e.name || e.message || e) + ')'); }
+      return;
+    }
+    try { if (stream) stream.getTracks().forEach(t => t.stop());
       stream = await navigator.mediaDevices.getUserMedia({ video: v }); $('cam').srcObject = stream; camId = stream.getVideoTracks()[0].getSettings().deviceId || camId; await listCams();
     } catch (e) { if (camId || facing) { camId = ''; facing = ''; return startCam(); } toast('Camera unavailable (' + e.name + ')'); }
   }
+  /** Is the camera actually delivering frames right now? */
+  const camLive = () => { const c = $('cam'), t = c.srcObject && c.srcObject.getVideoTracks()[0]; return !!(t && t.readyState === 'live' && !t.muted && c.videoWidth > 0); };
   /** Phones: flip between the selfie and the back camera. */
   function flipCam() { facing = facing === 'environment' ? 'user' : 'environment'; camId = ''; return startCam(); }
   $('camsel').onchange = e => { camId = e.target.value; try { localStorage.setItem('rcc-cam', camId); } catch (_) {} startCam(); };
@@ -458,9 +468,9 @@
   function applyLook() {
     root.style.setProperty('--ac', P.accent); root.style.setProperty('--fs', P.fs + 'px'); $('acc').value = P.accent;
     document.querySelectorAll('.swatch').forEach(s => s.classList.toggle('on', s.dataset.c === P.accent));
-    $('ambient').style.display = P.motion ? '' : 'none';
+    document.body.classList.toggle('grain', !!P.motion);
     const hex = P.accent, r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
-    root.style.setProperty('--ac2', `hsl(${(Math.round(Math.atan2(Math.sqrt(3) * (g - b), 2 * r - g - b) * 180 / Math.PI) + 360 + 50) % 360} 85% 62%)`);
+    root.style.setProperty('--ac2', `rgb(${Math.round(r * .72)} ${Math.round(g * .72)} ${Math.round(b * .72)})`);   // darker shade of the accent for hover / pressed
   }
   $('swatches').innerHTML = ACCENTS.map(c => `<span class="swatch" data-c="${c}" style="background:${c}"></span>`).join('');
   document.querySelectorAll('.swatch').forEach(s => s.onclick = () => { P.accent = s.dataset.c; saveP(); applyLook(); showChord(); });
@@ -530,7 +540,7 @@
     RCC.tuner.init({ audio, toast });
     RCC.learn.init({ toast, audio, accent: () => P.accent, jam: (text, title) => { loadSong(tempSong(title, text, { artist: 'Theory lesson' })); show('practice'); }, useChord: n => { loadSong(tempSong(n, '[Chord]\n' + n, { artist: 'Chord library' })); show('practice'); }, track: o => Store.track(o), bpm: () => P.bpm, drill: (text, name) => { if (RCC.solo.openTab(text, name)) show('solo'); } });
     RCC.gear.init({ toast, bpm: () => P.bpm, beats: () => +$('beats').value });
-    if (RCC.record) RCC.record.init({ toast, setOutputSize, flipCam, setMode, modes: OV.MODES, P, saveP, running: () => running, toggle, songTitle: () => (song && song.title) || '', out: cv, renderStreamUI });
+    if (RCC.record) RCC.record.init({ toast, setOutputSize, flipCam, camLive, startCam, setMode, modes: OV.MODES, P, saveP, running: () => running, toggle, songTitle: () => (song && song.title) || '', out: cv, renderStreamUI });
     RCC.scales.init({ audio, toast, track: o => Store.track(o), drill: (text, name) => { if (RCC.solo.openTab(text, name)) show('solo'); }, accent: () => P.accent, jam: (text, title) => { loadSong(tempSong(title, text, { artist: 'Scale Lab' })); show('practice'); } });
     await Store.init(); RCC.controls.init();
     renderAcct(); renderLib(); renderStreamUI();

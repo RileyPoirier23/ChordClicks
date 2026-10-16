@@ -182,7 +182,7 @@ app.whenReady().then(() => {
 
   win = new BrowserWindow({
     width: 1360, height: 860, minWidth: 1040, minHeight: 680,
-    backgroundColor: '#0b0b12', title: 'ChordClicks', autoHideMenuBar: true,
+    backgroundColor: '#121212', title: 'ChordClicks', autoHideMenuBar: true,
     icon: path.join(__dirname, 'build', 'icon.png'),
     webPreferences: { webviewTag: true, preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false },
   });

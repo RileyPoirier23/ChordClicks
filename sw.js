@@ -1,6 +1,6 @@
 /* ChordClicks service worker: caches the whole app so the browser / phone version opens and works with no
    connection. Saved songs live in localStorage, so they are always available; only Ultimate Guitar needs Wi-Fi. */
-const VERSION = 'chordclicks-3.1.0';
+const VERSION = 'chordclicks-3.2.0';
 const SHELL = [
   './', './index.html', './manifest.webmanifest', './build/icon.png', './src/styles.css',
   './src/lib/theory.js', './src/lib/pitch.js', './src/lib/song.js', './src/lib/chroma.js', './src/lib/sync.js', './src/lib/requests.js',

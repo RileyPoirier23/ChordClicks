@@ -18,6 +18,10 @@
     // guitar monitor path (heard) – kept apart so it can be muted while still being recorded
     A.monBus = c.createDynamicsCompressor(); A.monBus.threshold.value = -2; A.monBus.ratio.value = 20; A.monBus.connect(c.destination);
     A.recGuitar = c.createGain(); A.recGuitar.connect(A.recDest);
+    // iOS/Safari suspend the context when the mic opens, on a phone call, or in the background: wake it on the next tap
+    c.onstatechange = () => { if (c.state !== 'running') A._wake = true; };
+    ['pointerdown', 'touchend', 'keydown'].forEach(ev => document.addEventListener(ev, () => { if (A._wake || c.state === 'suspended' || c.state === 'interrupted') { A._wake = false; c.resume().catch(() => {}); } }, { passive: true }));
+    document.addEventListener('visibilitychange', () => { if (!document.hidden && c.state !== 'running') c.resume().catch(() => {}); });
     return c;
   };
   A.resume = () => { const c = A.get(); return c.state === 'suspended' ? c.resume() : Promise.resolve(); };
@@ -64,27 +68,50 @@
   };
 
   /* ================================================================ shared microphone / interface input */
-  const In = (A.input = { refs: 0, stream: null, source: null, deviceId: lsGet('rcc-input', ''), _l: [], opening: null });
+  const In = (A.input = { refs: 0, stream: null, source: null, deviceId: lsGet('rcc-input', ''), _l: [], opening: null, video: null, onVideo: null });
+  // iPhone / iPad: Safari allows ONE active capture. Opening the mic separately would silently kill the camera
+  // (the UI kept "recording" black frames), so on those devices camera + mic are requested together and shared.
+  In.combined = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   In.onChange = f => In._l.push(f);
   In.devices = async () => { try { return (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'audioinput' && d.deviceId !== 'communications'); } catch (e) { return []; } };
+  const audioCons = id => ({ deviceId: id ? { exact: id } : undefined, echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 });
+  function stopTracks(st) { try { st && st.getTracks().forEach(t => t.stop()); } catch (e) {} }
+  async function grab(cons) {
+    try { return await navigator.mediaDevices.getUserMedia(cons); }
+    catch (e) { // a stale device id: fall back to the default of that kind
+      if (cons.audio && cons.audio.deviceId) { In.deviceId = ''; lsSet('rcc-input', ''); return navigator.mediaDevices.getUserMedia({ ...cons, audio: audioCons('') }); }
+      if (cons.video && cons.audio) { try { const a = await navigator.mediaDevices.getUserMedia({ audio: cons.audio }); In._videoFailed = e; return a; } catch (e2) { throw e; } }
+      throw e;
+    }
+  }
+  /** (Re)open whatever is wanted right now: the mic when something holds a ref, the camera when the app asked for it. */
   async function openStream() {
-    const c = A.get(); await A.resume();
-    const mk = id => navigator.mediaDevices.getUserMedia({ audio: { deviceId: id ? { exact: id } : undefined, echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 } });
-    try { In.stream = await mk(In.deviceId); } catch (e) { if (In.deviceId) { In.deviceId = ''; lsSet('rcc-input', ''); In.stream = await mk(''); } else throw e; }
-    In.source = c.createMediaStreamSource(In.stream);
+    const c = A.get(); A.resume().catch(() => {});          // never block on this: before the first tap, resume() just waits
+    const wantA = In.refs > 0, wantV = In.combined && !!In.video;
+    if (!wantA && !wantV) { closeStream(); return; }
+    const cons = {}; if (wantA) cons.audio = audioCons(In.deviceId); if (wantV) cons.video = In.video;
+    const st = await grab(cons); const old = In.stream; In.stream = st;
+    if (wantA && st.getAudioTracks().length) { try { In.source && In.source.disconnect(); } catch (e) {} In.source = c.createMediaStreamSource(new MediaStream(st.getAudioTracks())); }
+    else { try { In.source && In.source.disconnect(); } catch (e) {} In.source = null; }
+    if (In.combined && In.onVideo) In.onVideo(st.getVideoTracks().length ? st : null);
+    stopTracks(old);
+    await Promise.race([A.resume(), new Promise(r => setTimeout(r, 800))]).catch(() => {});   // iOS flips the audio session to play+record here and can leave the context suspended
   }
   /** Acquire the shared input; call In.release() when done. Resolves to the MediaStreamAudioSourceNode. */
   In.open = async () => {
     In.refs++;
     try { if (!In.source) { In.opening = In.opening || openStream(); await In.opening; In.opening = null; } } catch (e) { In.refs--; In.opening = null; throw e; }
+    if (!In.source) { In.refs--; throw new Error('No microphone'); }
     return In.source;
   };
-  In.release = () => { In.refs = Math.max(0, In.refs - 1); if (!In.refs) closeStream(); };
-  function closeStream() { try { In.stream && In.stream.getTracks().forEach(t => t.stop()); In.source && In.source.disconnect(); } catch (e) {} In.stream = In.source = null; }
+  In.release = () => { In.refs = Math.max(0, In.refs - 1); if (!In.refs) { if (In.combined && In.video) openStream().catch(() => {}); else closeStream(); } };
+  function closeStream() { stopTracks(In.stream); try { In.source && In.source.disconnect(); } catch (e) {} In.stream = In.source = null; if (In.combined && In.onVideo) In.onVideo(null); }
   In.setDevice = async id => {
     In.deviceId = id || ''; lsSet('rcc-input', In.deviceId);
-    if (In.refs) { closeStream(); await openStream(); In._l.forEach(f => { try { f(In.source); } catch (e) { console.error(e); } }); }
+    if (In.refs) { await openStream(); In._l.forEach(f => { try { f(In.source); } catch (e) { console.error(e); } }); }
   };
+  /** Camera wanted (constraints) or not (null). Only used on one-capture devices; elsewhere the app opens the camera itself. */
+  In.setVideo = async v => { In.video = v; if (!In.combined) return false; await openStream(); if (In.refs) In._l.forEach(f => { try { f(In.source); } catch (e) {} }); return true; };
 
   /* ================================================================ guitar FX chain */
   const FX_DEFS = {
@@ -298,10 +325,12 @@
     const stream = new MediaStream(tracks), pick = (video ? ['video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/mp4;codecs=avc1,mp4a.40.2', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'] : ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4']).find(m => MediaRecorder.isTypeSupported(m)) || '';
     Rec.mime = pick; Rec.video = video; Rec.chunks = [];
     Rec.rec = new MediaRecorder(stream, { mimeType: pick || undefined, videoBitsPerSecond: 5e6, audioBitsPerSecond: 192e3 });
-    Rec.rec.ondataavailable = e => { if (e.data && e.data.size) Rec.chunks.push(e.data); };
-    Rec.rec.start(1000); Rec.t0 = performance.now();
+    Rec.bytes = 0; Rec.rec.ondataavailable = e => { if (e.data && e.data.size) { Rec.chunks.push(e.data); Rec.bytes += e.data.size; } };
+    Rec.rec.start(500); Rec.t0 = performance.now();
   };
   Rec.active = () => !!(Rec.rec && Rec.rec.state === 'recording');
+  /** true once the recorder has produced data (a stalled camera or an unsupported canvas stream never does) */
+  Rec.flowing = () => (Rec.bytes || 0) > 0;
   Rec.elapsed = () => (Rec.active() ? (performance.now() - Rec.t0) / 1000 : 0);
   Rec.stop = () => new Promise(res => {
     if (!Rec.rec) return res(null); const dur = (performance.now() - Rec.t0) / 1000;
@@ -325,7 +354,7 @@
     const buf = new Float32Array(4096), db = new Float32Array(Ls.fft.frequencyBinCount); let slow = 0, lastOn = 0, tick = 0;
     Ls.timer = setInterval(() => {
       Ls.an.getFloatTimeDomainData(buf); const t = c.currentTime;
-      const r = RCC.pitch.yin(buf, c.sampleRate, { minF: 70, maxF: 1000, threshold: .13 });
+      const r = RCC.pitch.yin(RCC.pitch.decimate(buf, 2), c.sampleRate / 2, { minF: 70, maxF: 1000, threshold: .13 });
       const loud = r.rms > Ls.gate; slow = slow * .85 + r.rms * .15;
       const onset = loud && r.rms > Math.max(Ls.gate * 1.5, slow * 1.45) && t - lastOn > .09; if (onset) lastOn = t;
       const ev = { freq: loud && r.prob > .85 ? r.freq : -1, prob: r.prob, rms: r.rms, t, onset }; Ls.last = ev;

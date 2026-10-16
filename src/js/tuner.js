@@ -70,7 +70,7 @@
   }
   function stop() {
     if (!running) return; running = false; clearInterval(timer); try { src && src.disconnect(filters.hp1); an && an.disconnect(); } catch (e) {} RCC.audio.input.release(); intn = null; paintIntn();
-    $('tonbtn').textContent = 'Start tuner'; $('lvl').style.width = '0'; hitIdx = -1; shown.has = false; paintPegs(); $('tnote').textContent = '—'; $('tinfo').textContent = 'Pick your input, then press Start';
+    $('tonbtn').textContent = 'Start tuner'; $('lvl').style.width = '0'; if ($('cbar')) $('cbar').hidden = true; hitIdx = -1; shown.has = false; paintPegs(); $('tnote').textContent = '—'; $('tinfo').textContent = 'Pick your input, then press Start';
   }
 
   const buf = new Float32Array(8192);
@@ -82,11 +82,12 @@
     if (rms >= thr) {
       const fsT = tuning().map(n => T.noteToFreq(n, cfg.a4)); let opts = { minF: Math.max(25, Math.min(...fsT) * .7), maxF: Math.min(1500, Math.max(...fsT) * 2.2), threshold: .13 };
       if (cfg.mode === 'lock') { const f = T.noteToFreq(tuning()[lockIdx], cfg.a4); opts = { minF: f * .7, maxF: f * 1.6, threshold: .13 }; }
-      const r = P.yin(buf, sr, opts); freq = r.freq; prob = r.prob;
-      if (freq > 0) freq = sr / P.refine(buf, sr / freq);   // measure over several periods for a steady, precise reading
+      // detect on a half-rate copy (4x cheaper, phones stay smooth), then check the octave and refine on the full-rate buffer
+      const r = P.yin(P.decimate(buf, 2), sr / 2, opts); prob = r.prob;
+      if (r.freq > 0) { let tau = r.tau * 2; if (cfg.mode !== 'lock') tau = P.octaveCheck(buf, tau, sr / opts.minF); freq = sr / P.refine(buf, tau); }
     }
     floor = rms < floor ? rms : floor * .9999 + rms * .0001;        // slow noise-floor estimate, keeps hiss from reading as a note
-    if (rms < Math.max(thr, floor * 2.5)) freq = -1;
+    if (rms < Math.max(thr, Math.min(floor * 1.6, .02))) freq = -1;
     const now = performance.now();
     if (freq > 0 && prob > .85) {
       // ignore one-off octave/outlier jumps; accept a new note once it persists for 3 readings
@@ -94,7 +95,7 @@
       hist.push(freq); if (hist.length > 5) hist.shift();
       const med = P.median(hist), good = hist.filter(f => Math.abs(1200 * Math.log2(f / med)) < 40), f = good.reduce((a, b) => a + b, 0) / good.length;
       lastGood = now; show(f, now);
-    } else if (now - lastGood > 1200) { hist = []; emaC = null; lastStr = -1; shown.has = false; hitIdx = cfg.mode === 'lock' ? lockIdx : -1; if (running) { $('tnote').textContent = '—'; $('tinfo').textContent = rms < thr ? 'Listening… pluck a string' : 'Hmm, not a clear note — pluck one string'; } paintPegs(); }
+    } else if (now - lastGood > 1200) { hist = []; emaC = null; lastStr = -1; shown.has = false; hitIdx = cfg.mode === 'lock' ? lockIdx : -1; if (running) { $('tnote').textContent = '—'; $('tinfo').textContent = rms < thr ? 'Listening… pluck a string' : 'Hmm, not a clear note — pluck one string'; const cb = $('cbar'); if (cb) cb.hidden = true; } paintPegs(); }
   }
   function show(f, now) {
     let name, oct, cents, target;
@@ -114,6 +115,7 @@
     const dir = shown.ok ? 'In tune ✓' : Math.abs(cents) < 4 ? 'Almost…' : Math.abs(cents) < 12 ? (cents < 0 ? 'A touch low ↑' : 'A touch high ↓') : cents < 0 ? 'Too low – tune up ↑' : 'Too high – tune down ↓';
     $('tinfo').textContent = f.toFixed(1) + ' Hz · ' + (cents > 0 ? '+' : '') + cents.toFixed(Math.abs(cents) < 10 ? 1 : 0) + '¢ · ' + dir;
     document.querySelector('.tuner-main').style.setProperty('--tune', shown.ok ? '#34d399' : Math.abs(cents) < 15 ? '#fbbf24' : '#8b5cf6');
+    const cb = $('cbar'); if (cb) { cb.hidden = false; cb.querySelector('i').style.left = (50 + Math.max(-50, Math.min(50, cents))) + '%'; cb.classList.toggle('ok', shown.ok); $('cbar-v').textContent = (cents > 0 ? '+' : '') + cents.toFixed(Math.abs(cents) < 10 ? 1 : 0); $('cbar-dir').textContent = shown.ok ? '✓' : cents < -3 ? '↑ tighten' : cents > 3 ? '↓ loosen' : '·'; }
     paintPegs();
   }
 

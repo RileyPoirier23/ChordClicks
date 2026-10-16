@@ -2,12 +2,12 @@
   "appId": "ca.clicks506.chordclicks",
   "appName": "ChordClicks",
   "webDir": "www",
-  "backgroundColor": "#09090f",
+  "backgroundColor": "#121212",
   "server": { "androidScheme": "https" },
-  "android": { "allowMixedContent": false, "backgroundColor": "#09090f" },
-  "ios": { "contentInset": "always", "backgroundColor": "#09090f" },
+  "android": { "allowMixedContent": false, "backgroundColor": "#121212" },
+  "ios": { "contentInset": "always", "backgroundColor": "#121212" },
   "plugins": {
     "CapacitorHttp": { "enabled": true },
-    "SplashScreen": { "launchShowDuration": 0, "backgroundColor": "#09090f" }
+    "SplashScreen": { "launchShowDuration": 0, "backgroundColor": "#121212" }
   }
 }

@@ -5,13 +5,13 @@
 <title>ChordClicks</title>
 <link rel="stylesheet" href="src/styles.css">
 <link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#09090f">
+<meta name="theme-color" content="#121212">
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="apple-touch-icon" href="build/icon.png">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
- <linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8b5cf6"/><stop offset="1" stop-color="#ec4899"/></linearGradient>
+ <linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#c8102e"/><stop offset="1" stop-color="#9b0c23"/></linearGradient>
  <symbol id="logo" viewBox="0 0 64 64"><path d="M32 3C49 3 60 14 58 29 56 45 41 59 32 61 23 59 8 45 6 29 4 14 15 3 32 3Z" fill="url(#lg)"/><path d="M36 12 20 35h10l-3 17 17-25H34Z" fill="#fff"/></symbol>
 </defs></svg>
 <video id="cam" autoplay playsinline muted></video><video id="pip" muted playsinline></video><canvas id="out" width="1280" height="720"></canvas>
@@ -211,6 +211,7 @@
     <div class="card tuner-main">
      <canvas id="gauge" width="1120" height="590"></canvas>
      <div id="tnote">—</div><div id="tinfo">Pick your input, then press Start</div>
+     <div id="cbar" hidden><span class="small">♭</span><div class="track"><b></b><i></i></div><span class="small">♯</span><b id="cbar-v">0</b><span id="cbar-dir" class="small">·</span></div>
      <div id="tstrings"></div>
      <button class="btn p big" id="tonbtn" style="padding:12px 30px;font-size:15px">Start tuner</button>
     </div>
@@ -363,11 +364,11 @@
    <section class="view" id="v-settings">
     <div class="stack">
      <div class="card"><h4>Look</h4>
-      <div class="row"><label class="l">Accent</label><div class="swatches" id="swatches"></div><input type="color" id="acc" value="#8b5cf6" style="padding:0;width:34px;height:30px;border-radius:8px"></div>
+      <div class="row"><label class="l">Accent</label><div class="swatches" id="swatches"></div><input type="color" id="acc" value="#c8102e" style="padding:0;width:34px;height:30px;border-radius:8px"></div>
       <div class="row"><label class="l">Sheet text</label><input type="range" id="fsr" min="12" max="34" value="17"></div>
       <div class="row"><label class="l">Auto-scroll</label><input type="range" id="asr" min="0" max="10" value="0"></div>
       <div class="row"><label class="tg"><span class="sw"><input type="checkbox" id="autopat" checked><i></i></span>Switch strumming pattern by song section</label></div>
-      <div class="row"><label class="tg"><span class="sw"><input type="checkbox" id="motion" checked><i></i></span>Animated background</label></div></div>
+      <div class="row"><label class="tg"><span class="sw"><input type="checkbox" id="motion"><i></i></span>Paper grain background</label></div></div>
     </div>
     <div class="stack">
      <div class="card"><h4>Account &amp; songs</h4><div id="acct-info" class="small"></div>

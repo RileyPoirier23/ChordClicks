@@ -26,17 +26,24 @@
     if (R.active()) {
       const t = await R.stop(); $('rec-go').classList.remove('rec'); $('rec-go').title = 'Record'; $('rec-stage').classList.remove('recording');
       await A.setMicRecorded(false); if ($('rec-stopsong').checked && D.running()) D.toggle();
-      if (t) openEditor(t); return;
+      if (t && t.size > 2000) openEditor(t); else D.toast('Nothing was recorded'); return;
     }
     if (!R.supported()) { D.toast('Recording is not supported in this browser'); return; }
     try { A.get(); await A.resume(); if ($('rec-mic').checked) await A.setMicRecorded(true); } catch (e) { D.toast('Microphone unavailable: ' + (e.message || e)); $('rec-mic').checked = false; }
     A.setClickRecorded($('rec-click').checked); A.recGuitar.gain.value = A.fx && A.fx.running ? 1 : 0;
     let n = 3; $('rec-count').hidden = false;
     await new Promise(res => { const step = () => { if (n <= 0) { $('rec-count').hidden = true; res(); return; } $('rec-count').textContent = n--; A.click(A.get().currentTime + .01, n === 2, false, .6); setTimeout(step, 1000); }; step(); });
+    if (D.camLive && !D.camLive()) { await D.startCam(); await new Promise(r => setTimeout(r, 600)); }
+    if (D.camLive && !D.camLive()) { D.toast('The camera isn’t sending video — allow camera access and try again'); await A.setMicRecorded(false); return; }
     R.start({ canvas: D.out, video: true }); $('rec-go').classList.add('rec'); $('rec-go').title = 'Stop'; $('rec-stage').classList.add('recording');
     if ($('rec-autosong').checked && !D.running()) D.toggle();
+    // prove it: the recorder must have produced data and the camera must still be live a moment in, or we stop and say so
+    setTimeout(async () => {
+      if (!R.active()) return;
+      const dead = !R.flowing() || (D.camLive && !D.camLive());
+      if (dead) { const t = await R.stop(); $('rec-go').classList.remove('rec'); $('rec-stage').classList.remove('recording'); await A.setMicRecorded(false); if (D.running()) D.toggle(); D.toast(!R.flowing() ? 'Recording didn’t start: this browser can’t record the camera view. Try the ChordClicks app or Chrome.' : 'The camera stopped when the mic opened, so the recording was cancelled. Turn off “Mic / voice” and try again.'); }
+    }, 2500);
   }
-
   /* ---------- editor ---------- */
   function openEditor(t) {
     take = t; dur = t.dur; trim = { a: 0, b: t.dur }; $('rec-edit').hidden = false; $('rec-stage').classList.add('editing');
