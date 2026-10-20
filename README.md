@@ -26,7 +26,8 @@ Upgrading from Chordify? Your accounts and songs are copied over automatically o
 ## Free and Pro
 Practice, Find/import (20 songs), tuner, scales, chord library, Solo watch mode and Record are free. **Pro** ($24.99 once) adds
 play-along scoring, the trainers, arpeggios / triads / CAGED, the looper, the streaming kit, unlimited library + set lists,
-all fingerpicking patterns and cloud sync. Everyone gets a 7-day trial in-app. Keys are verified offline:
+all fingerpicking patterns and cloud sync. Everyone gets a 7-day trial in-app. Checkout is Stripe Payment Links + a webhook on the helper server that issues and emails
+keys automatically — see **docs/CHECKOUT.md** for the 10-minute setup. Keys are verified offline:
 ```
 node scripts/licence.mjs keygen              # once: writes licence-private.jwk (keep it secret) and installs the public key in src/js/pro.js
 node scripts/licence.mjs issue "Jane Doe" --email jane@example.com   # per order: prints a CCPRO-… key to email the buyer

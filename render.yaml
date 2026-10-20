@@ -11,6 +11,17 @@ services:
     envVars:
       - key: DATA_DIR
         value: /var/data
+      # Pro checkout (see docs/CHECKOUT.md). Fill these in the Render dashboard; sync: false keeps them out of the blueprint.
+      - key: LICENCE_PRIVATE_JWK
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: MAIL_FROM
+        sync: false
     disk:
       name: data
       mountPath: /var/data
