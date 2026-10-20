@@ -14,6 +14,7 @@ Then in Render → the service → **Environment**, add:
 | `STRIPE_WEBHOOK_SECRET` | from step 3 (`whsec_…`) |
 | `RESEND_API_KEY` | optional, from https://resend.com (free 3k emails/month) so keys are emailed automatically |
 | `MAIL_FROM` | optional, e.g. `ChordClicks <keys@506clicks.ca>` (verify the domain in Resend) |
+| `ADMIN_TOKEN` | any long random string; paste the same one into 506clicks.ca/admin to see orders and issue keys |
 | `SITE_THANKS` | optional, `https://www.506clicks.ca/projects/chordclicks/thanks/` |
 
 Check: `https://<your-server>/api/health` → `{"ok":true}`.

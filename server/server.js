@@ -93,6 +93,21 @@ function createServer({ dataDir = path.join(__dirname, '..', 'server-data'), all
         const sess = await stripeGet('/checkout/sessions/' + encodeURIComponent(sid)); const o = await keyForSession(sess);
         return out(res, 200, { ok: true, key: o.key, email: o.email, mailed: o.mailed });
       }
+      // Owner's panel (506clicks.ca/admin): needs ADMIN_TOKEN. Stats + manual key issue.
+      const adminOk = q => process.env.ADMIN_TOKEN && q && crypto.timingSafeEqual(Buffer.from(String(q).padEnd(64).slice(0, 64)), Buffer.from(String(process.env.ADMIN_TOKEN).padEnd(64).slice(0, 64)));
+      if (url === '/api/admin/stats' || url === '/api/admin/issue') {
+        if (limited(ip, 30)) return out(res, 429, { ok: false, error: 'Too many requests' });
+        const q = req.method === 'GET' ? new URL(req.url, 'http://x').searchParams.get('token') : (await body(req));
+        const tok = typeof q === 'string' ? q : q && q.token; if (!adminOk(tok)) return out(res, 401, { ok: false, error: 'Bad admin token' });
+        if (url === '/api/admin/stats') {
+          const orders = Object.entries(rd(ordersFile, {})).map(([id, o]) => ({ id: id.slice(-8), at: o.at, email: String(o.email || '').replace(/^(.).*(@.*)$/, '$1…$2'), name: o.name, mailed: o.mailed, manual: !!o.manual })).sort((a, b) => b.at - a.at);
+          return out(res, 200, { ok: true, orders: orders.slice(0, 50), count: orders.length, users: Object.keys(rd(usersFile, {})).length, stripe: !!process.env.STRIPE_SECRET_KEY, mail: !!process.env.RESEND_API_KEY, signing: !!process.env.LICENCE_PRIVATE_JWK });
+        }
+        const { name = '', email = '' } = q || {}; const key = await signKey({ n: String(name).slice(0, 40), e: String(email).slice(0, 60), i: Date.now(), x: 0, v: 1 });
+        const orders = rd(ordersFile, {}); const id = 'manual_' + Date.now(); orders[id] = { key, email, name, at: Date.now(), mailed: false, manual: true };
+        try { orders[id].mailed = email ? await sendKeyMail(email, name, key) : false; } catch (e) {} wr(ordersFile, orders);
+        return out(res, 200, { ok: true, key, mailed: orders[id].mailed });
+      }
       if (req.method === 'POST' && url === '/api/stripe/webhook') {
         const raw = await rawBody(req); if (!stripeSigOk(raw, req.headers['stripe-signature'])) return out(res, 400, { ok: false, error: 'Bad signature' });
         const ev = JSON.parse(raw);
