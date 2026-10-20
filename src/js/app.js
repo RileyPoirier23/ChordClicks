@@ -308,7 +308,7 @@
     const st = RCC.pro.status(), box = $('pro-body'); if (!box) return;
     box.innerHTML = `<div class="row" style="margin:0 0 8px"><span class="pro-tag big">${st.kind === 'free' ? 'FREE' : 'PRO'}</span><b>${esc(st.label)}</b></div>
       ${st.kind === 'pro' ? `<div class="small">Thanks for supporting ChordClicks. Your key works offline on any of your devices.</div><div class="row"><button class="btn sm" id="pro-off">Remove key from this device</button></div>`
-      : `<ul class="pro-list compact">${RCC.pro.FEATURES.map(f => `<li><b>${esc(f[1])}</b></li>`).join('')}</ul><div class="row">${RCC.pro.trialUsed() ? '' : `<button class="btn p" id="pro-try">Start ${RCC.pro.TRIAL_DAYS}-day trial</button>`}<a class="btn ${RCC.pro.trialUsed() ? 'p' : ''}" href="${RCC.pro.BUY_URL}" target="_blank" rel="noreferrer">Buy Pro · ${RCC.pro.PRICE}</a><button class="btn" id="pro-enter">Enter key</button></div>`}`;
+      : `<ul class="pro-list compact">${RCC.pro.FEATURES.map(f => `<li><b>${esc(f[1])}</b></li>`).join('')}</ul><div class="row">${RCC.pro.trialUsed() ? '' : `<button class="btn p" id="pro-try">Start ${RCC.pro.TRIAL_DAYS}-day trial</button>`}${RCC.pro.live() ? `<a class="btn ${RCC.pro.trialUsed() ? 'p' : ''}" href="${esc(RCC.pro.BUY_URL)}" target="_blank" rel="noreferrer">Buy Pro · ${esc(RCC.pro.PRICE)}</a>` : '<span class="small">Keys go on sale soon at 506clicks.ca</span>'}<button class="btn" id="pro-enter">Enter key</button></div>`}`;
     const t = $('pro-try'); if (t) t.onclick = () => { RCC.pro.startTrial(); toast('Pro trial started'); };
     const k = $('pro-enter'); if (k) k.onclick = () => RCC.pro.keyDialog();
     const o = $('pro-off'); if (o) o.onclick = async () => { if (await askConfirm('Remove the Pro key from this device?', 'Remove')) RCC.pro.deactivate(); };
@@ -600,7 +600,7 @@
     if (R) R.version().then(v => { $('ver').textContent = $('ver2').textContent = 'v' + v; });
     paintOnline(); paintPro(); paintProxy(); RCC.pro.onChange(() => { paintPro(); renderLib(); });
     $('sup-pro').onclick = () => (RCC.pro.has() ? show('settings') : RCC.pro.upsell());
-    if (!P.welcomed) setTimeout(welcome, 600);
+    if (!P.welcomed) setTimeout(welcome, 600); else setTimeout(() => RCC.pro.splash(), 900);
     $('sup-share').onclick = async () => { const url = 'https://www.506clicks.ca/projects/chordclicks/', text = 'ChordClicks — free guitar practice app with your chords on camera'; try { if (navigator.share) await navigator.share({ title: 'ChordClicks', text, url }); else { await navigator.clipboard.writeText(url); toast('Link copied — thanks for sharing!'); } } catch (e) {} };
     if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => {});
     loadSong(tempSong('Sample', '[Verse]\nAm        F\nPaste a song from Ultimate Guitar here\nC         G\nand the chords show up on your camera'));
