@@ -23,6 +23,22 @@ The installer keeps itself up to date. Windows may warn about an unknown publish
 
 Upgrading from Chordify? Your accounts and songs are copied over automatically on first launch.
 
+## Free and Pro
+Practice, Find/import (20 songs), tuner, scales, chord library, Solo watch mode and Record are free. **Pro** ($24.99 once) adds
+play-along scoring, the trainers, the looper, the streaming kit, unlimited library + set lists, all fingerpicking patterns and
+cloud sync. Everyone gets a 7-day trial in-app. Keys are verified offline:
+```
+node scripts/licence.mjs keygen              # once: writes licence-private.jwk (keep it secret) and installs the public key in src/js/pro.js
+node scripts/licence.mjs issue "Jane Doe" --email jane@example.com   # per order: prints a CCPRO-… key to email the buyer
+node scripts/licence.mjs verify CCPRO-…
+```
+
+## Ultimate Guitar on web and phones (helper server)
+Browsers block cross-site reads, so the web and phone builds relay Ultimate Guitar through a tiny server you run for free:
+either `deploy/ug-proxy.worker.js` on Cloudflare Workers (`wrangler deploy deploy/ug-proxy.worker.js --name chordclicks-ug`)
+or this repo on Render (`render.yaml`, which also hosts cloud sync). Paste the address into Settings → Helper server.
+The Windows app needs none of this.
+
 ## Phone / tablet
 The same app runs as a native Android / iOS app through Capacitor, and as an installable web app (PWA). Saved songs,
 practice, solo scoring, scales, learn, tuner, gear and Record all work with no connection; Ultimate Guitar search needs Wi-Fi.

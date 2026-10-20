@@ -65,6 +65,7 @@
     if (D.result) D.result({ key: 'solo:' + (D.songTitle ? D.songTitle() : '') + ':' + (sec ? sec.name : ''), acc: a, grade: g, hits: sc.hits, miss: sc.miss, combo: sc.best, mode: st.mode });
   }
   async function setMode(m) {
+    if (m !== 'watch' && RCC.pro && !RCC.pro.gate('score')) { m = 'watch'; }
     st.mode = m; document.querySelectorAll('#solo-mode button').forEach(b => b.classList.toggle('on', b.dataset.v === m)); resetScore(); $('solo-lat-wrap').hidden = m === 'watch';
     if (m === 'watch') { if (unListen) { unListen(); unListen = null; } return; }
     if (unListen) return;

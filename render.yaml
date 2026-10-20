@@ -1,0 +1,17 @@
+# One-click deploy of the ChordClicks helper server (cloud sync + Ultimate Guitar relay) on Render's free tier.
+# https://render.com → New → Blueprint → point it at this repo. Then paste the service URL into
+# ChordClicks → Settings → Helper server (and Cloud sync).
+services:
+  - type: web
+    name: chordclicks-server
+    runtime: node
+    plan: free
+    buildCommand: "true"
+    startCommand: node server/server.js
+    envVars:
+      - key: DATA_DIR
+        value: /var/data
+    disk:
+      name: data
+      mountPath: /var/data
+      sizeGB: 1

@@ -29,7 +29,7 @@
     a.P.ov = Object.assign({}, a.P.ov, clone(s.ov)); a.P.ov.show = Object.assign({}, clone(SHOW), a.P.ov.show); if (s.mir != null) a.P.mir = s.mir;
     curScene = n; a.saveP(); saveScenes(); a.renderStreamUI(); paintScenes(); a.toast('Scene: ' + n);
   }
-  async function saveScene() { const a = A(), n = await a.askText('Scene name', curScene || 'My scene'); if (!n) return; scenes[n] = { ov: clone(a.P.ov), mir: a.P.mir }; curScene = n; saveScenes(); paintScenes(); a.toast('Scene saved'); }
+  async function saveScene() { if (RCC.pro && !RCC.pro.gate('stream')) return; const a = A(), n = await a.askText('Scene name', curScene || 'My scene'); if (!n) return; scenes[n] = { ov: clone(a.P.ov), mir: a.P.mir }; curScene = n; saveScenes(); paintScenes(); a.toast('Scene saved'); }
   async function delScene() { const a = A(); if (!curScene || !scenes[curScene]) return; if (names().length < 2) { a.toast('Keep at least one scene'); return; } if (await a.askConfirm('Delete scene “' + curScene + '”?')) { delete scenes[curScene]; curScene = ''; saveScenes(); paintScenes(); } }
 
   /* ================================================================ chat requests (Twitch, anonymous read-only) */
@@ -51,6 +51,7 @@
     chat.queue.push({ title: hit ? hit.title + (hit.artist ? ' – ' + hit.artist : '') : query, by, songId: hit && hit.id }); paintQ(); a.toast('Request: ' + query + ' (' + by + ')');
   }
   function connectChat() {
+    if (RCC.pro && !RCC.pro.gate('stream')) return;
     const ch = $('ch-chan').value.trim().replace(/^#/, '').toLowerCase(); if (!/^[a-z0-9_]{3,25}$/.test(ch)) { $('ch-stat').textContent = 'Enter your Twitch channel name (letters, numbers, underscore).'; return; }
     disconnectChat(); lsSet('rcc-chan', ch); chat.channel = ch; $('ch-stat').textContent = 'Connecting…';
     let ws; try { ws = new WebSocket('wss://irc-ws.chat.twitch.tv:443'); } catch (e) { $('ch-stat').textContent = 'Could not open a connection.'; return; }
@@ -123,7 +124,7 @@
     box.innerHTML = syncSt.on ? `<div class="small">Connected to <b style="color:var(--fg)">${esc(syncSt.url)}</b> as <b style="color:var(--fg)">${esc(syncSt.name)}</b>.${lastSync ? ' Last sync ' + new Date(lastSync).toLocaleTimeString() + '.' : ''}</div><div class="row"><button class="btn p" id="sy-now">Sync now</button><button class="btn" id="sy-out">Disconnect</button></div>`
       : `<div class="small">Keeps your songs, playlists, known chords and stats in step across computers. You need to run the small sync server (<code>node server/server.js</code>) somewhere you control.</div><div class="row"><input id="sy-url" class="grow" placeholder="https://your-server.example.com" value="${esc(lsGet('rcc-sync-url', ''))}"></div><div class="row"><input id="sy-name" class="grow" placeholder="Sync username"><input id="sy-pw" type="password" class="grow" placeholder="Password (8+ chars)"></div><div class="row"><button class="btn p" id="sy-in">Sign in</button><button class="btn" id="sy-reg">Create sync account</button></div><div class="err" id="sy-err"></div>`;
     if (syncSt.on) { $('sy-now').onclick = () => doSync(true); $('sy-out').onclick = async () => { await R.sync.logout(); paintSync(); }; }
-    else { const go = async reg => { lsSet('rcc-sync-url', $('sy-url').value.trim()); const r = await R.sync.login({ url: $('sy-url').value.trim(), name: $('sy-name').value, password: $('sy-pw').value, register: reg }); if (r.ok) { await paintSync(); doSync(true); } else $('sy-err').textContent = r.error || 'Failed'; }; $('sy-in').onclick = () => go(false); $('sy-reg').onclick = () => go(true); }
+    else { const go = async reg => { if (RCC.pro && !RCC.pro.gate('sync')) return; lsSet('rcc-sync-url', $('sy-url').value.trim()); const r = await R.sync.login({ url: $('sy-url').value.trim(), name: $('sy-name').value, password: $('sy-pw').value, register: reg }); if (r.ok) { await paintSync(); doSync(true); } else $('sy-err').textContent = r.error || 'Failed'; }; $('sy-in').onclick = () => go(false); $('sy-reg').onclick = () => go(true); }
   }
   async function doSync(manual) {
     if (!syncSt.on) return; const r = await A().Store.syncNow(); if (r && r.ok) { lastSync = Date.now(); if (manual) A().toast('Synced ✓'); paintSync(); } else if (manual) A().toast((r && r.error) || 'Sync failed');

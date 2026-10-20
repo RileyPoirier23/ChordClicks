@@ -112,6 +112,7 @@
   }
   async function loopRecord() {
     const l = A.looper; if (l.state === 'rec') { l.finish(); return; }
+    if (RCC.pro && !RCC.pro.gate('looper')) return;
     if (!A.fx || !A.fx.running) await power();
     const bars = +$('lp-bars').value, bpm = D.bpm ? D.bpm() : 100, beats = D.beats ? D.beats() : 4;
     l.comp = +$('lp-comp').value; await l.record({ bars, bpm, beats, countIn: $('lp-count').checked ? beats : 0 });

@@ -28,7 +28,20 @@ function createServer({ dataDir = path.join(__dirname, '..', 'server-data'), all
     const ip = req.socket.remoteAddress || '?';
     try {
       const url = req.url.split('?')[0];
+      res.setHeader('access-control-allow-origin', '*'); res.setHeader('access-control-allow-headers', 'authorization, content-type');
+      if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
       if (req.method === 'GET' && url === '/api/health') return out(res, 200, { ok: true });
+      // Ultimate Guitar relay for the web / phone builds (browsers block the cross-site fetch). Only UG pages, HTML only.
+      if (req.method === 'GET' && url === '/api/ug') {
+        if (limited(ip, 40)) return out(res, 429, { ok: false, error: 'Too many requests. Wait a minute.' });
+        const target = new URL(req.url, 'http://x').searchParams.get('url') || ''; let u; try { u = new URL(target); } catch (e) { return out(res, 400, { ok: false, error: 'Bad address' }); }
+        if (u.protocol !== 'https:' || !/(^|\.)ultimate-guitar\.com$/.test(u.hostname)) return out(res, 400, { ok: false, error: 'Only Ultimate Guitar pages' });
+        try {
+          const r = await fetch(u.href, { headers: { 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36', accept: 'text/html', 'accept-language': 'en-US,en;q=0.9' }, redirect: 'follow', signal: AbortSignal.timeout(20000) });
+          const html = await r.text(); const m = /class="js-store"[^>]*?data-content="([^"]*)"/.exec(html);
+          return out(res, 200, { ok: r.ok, status: r.status, html: m ? '<div class="js-store" data-content="' + m[1] + '"></div>' : html.slice(0, 200000) });
+        } catch (e) { return out(res, 502, { ok: false, error: 'Could not reach Ultimate Guitar' }); }
+      }
       if (req.method !== 'POST' && !(req.method === 'GET' && url === '/api/lib')) return out(res, 404, { ok: false });
       if (limited(ip)) return out(res, 429, { ok: false, error: 'Too many requests. Wait a minute.' });
       if (url === '/api/register' || url === '/api/login') {

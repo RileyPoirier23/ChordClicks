@@ -88,7 +88,7 @@
        <div class="row"><button class="btn" id="fp-solo" title="Opens the pattern as a tab in Solo so the app can listen and score you">🎯 Play it on guitar (Solo)</button><button class="btn" id="fp-prac" title="Load the chord in Practice and keep the pattern on screen">Use in Practice</button><button class="btn" id="fp-done">${done[p.id] ? '✓ Learned' : 'Mark as learned'}</button></div>
        <div class="small">Fingers: <span style="color:${FINGER.p[2]}">p</span> thumb · <span style="color:${FINGER.i[2]}">i</span> index · <span style="color:${FINGER.m[2]}">m</span> middle · <span style="color:${FINGER.a[2]}">a</span> ring. Slots step through the bar left to right; two fingers in one slot pluck together.</div>
       </div></div>`;
-    el.querySelectorAll('[data-p]').forEach(c => c.onclick = () => { stop(); st.pat = c.dataset.p; render(); });
+    el.querySelectorAll('[data-p]').forEach((c, i) => { if (i >= 3 && RCC.pro) RCC.pro.mark(c, 'finger'); c.onclick = () => { if (i >= 3 && RCC.pro && !RCC.pro.gate('finger')) return; stop(); st.pat = c.dataset.p; render(); }; });
     $('fp-chords').querySelectorAll('.chip').forEach(c => c.onclick = () => { st.chord = c.dataset.c; $('fp-chords').querySelectorAll('.chip').forEach(x => x.classList.toggle('on', x === c)); paintGrid(); });
     $('fp-play').onclick = play; $('fp-speed').oninput = e => { st.speed = +e.target.value; $('fp-speed-v').textContent = st.speed + '%'; if (playing) { stop(); play(); } };
     $('fp-solo').onclick = () => { stop(); if (D.drill) D.drill(tabText(), p.name + ' on ' + st.chord); };

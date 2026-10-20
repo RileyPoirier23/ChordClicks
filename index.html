@@ -114,8 +114,9 @@
     </aside>
     <div class="lib-main">
      <div class="lib-head"><h2 id="lib-title">All songs</h2><span class="small" id="lib-sub"></span><span class="grow"></span>
-      <button class="btn sm" id="lib-import">+ Import…</button><button class="btn p sm" id="lib-play">▶ Play all</button><button class="btn sm" id="lib-shuf">Shuffle</button><button class="btn sm" id="lib-notes">Gig notes</button><button class="btn sm" id="lib-pdf" title="Save the set as a PDF with all chord sheets">Set PDF</button><button class="btn sm" id="lib-print">Print</button><button class="btn sm" id="lib-ren">Rename</button><button class="btn sm danger" id="lib-del">Delete</button>
+      <button class="btn sm" id="lib-sel" title="Pick several songs to add to a playlist, tag or delete">Select</button><button class="btn sm" id="lib-import">+ Import…</button><button class="btn p sm" id="lib-play">▶ Play all</button><button class="btn sm" id="lib-shuf">Shuffle</button><button class="btn sm" id="lib-notes">Gig notes</button><button class="btn sm" id="lib-pdf" title="Save the set as a PDF with all chord sheets">Set PDF</button><button class="btn sm" id="lib-print">Print</button><button class="btn sm" id="lib-ren">Rename</button><button class="btn sm danger" id="lib-del">Delete</button>
       <select id="lib-filter" title="Show songs by how playable they are for you"><option value="all">All songs</option><option value="play">Songs I can play now</option><option value="close">Almost there (≤2 new chords)</option></select><input id="lib-q" placeholder="Filter…" style="width:140px"><select id="lib-sort"><option value="recent">Recent</option><option value="title">Title</option><option value="artist">Artist</option></select></div>
+     <div class="bulk card" id="bulk" hidden><b id="bulk-n">0 selected</b><button class="btn sm" id="bulk-all">All</button><select id="bulk-pl"><option value="">Add to playlist…</option></select><select id="bulk-g"><option value="">Set genre…</option></select><button class="btn sm danger" id="bulk-del">Delete</button><span class="grow"></span><button class="btn sm" id="bulk-x">Done</button></div>
      <div id="songs"></div>
     </div>
    </section>
@@ -126,6 +127,7 @@
      <label class="search grow"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
       <input id="ug-q" autocomplete="off" placeholder="Song or artist on Ultimate Guitar"><button class="btn p sm" id="ug-go">Search</button></label>
      <div class="seg sm" id="ug-type"><button data-v="chords" class="on">Chords</button><button data-v="tabs">Tabs</button><button data-v="all">All</button></div>
+     <select id="ug-sort" title="Order results"><option value="best">Best match</option><option value="rating">Highest rated</option><option value="votes">Most votes</option><option value="version">Newest version</option></select>
      <span class="small">Save to</span>
      <input id="imp-genre" list="genres" placeholder="Genre" style="width:120px"><datalist id="genres"></datalist>
      <select id="imp-pl"></select>
@@ -338,7 +340,7 @@
      <div class="card sup-hero"><svg class="logo" viewBox="0 0 64 64"><use href="#logo"/></svg>
       <h2>Support the creator</h2>
       <p>ChordClicks is free and made by one person after hours. If it helps your playing, the best support is simple: share it with a guitarist, follow along, and say hi.</p>
-      <div class="row"><button class="btn p" id="sup-share">Share ChordClicks</button><a class="btn" href="https://www.506clicks.ca/projects/chordclicks/" target="_blank" rel="noreferrer">506clicks.ca</a><a class="btn" href="https://github.com/RileyPoirier23/chordclicks/issues" target="_blank" rel="noreferrer">Report a bug / request a feature</a></div>
+      <div class="row"><button class="btn p" id="sup-pro">Go Pro</button><button class="btn" id="sup-share">Share ChordClicks</button><a class="btn" href="https://www.506clicks.ca/projects/chordclicks/" target="_blank" rel="noreferrer">506clicks.ca</a><a class="btn" href="https://github.com/RileyPoirier23/chordclicks/issues" target="_blank" rel="noreferrer">Report a bug / request a feature</a></div>
      </div>
      <div class="card"><h4>Created by</h4>
       <div class="sup-who"><b>Riley “Monkey Man” Poirier</b><span class="small">506Clicks · Moncton, New Brunswick</span></div>
@@ -374,6 +376,10 @@
      <div class="card"><h4>Account &amp; songs</h4><div id="acct-info" class="small"></div>
       <div class="row"><button class="btn" id="acct-btn">Sign in</button><button class="btn" id="exp">Export songs</button><button class="btn" id="imp-lib">Import songs</button></div></div>
      <div class="card"><h4>Hotkeys &amp; foot pedal</h4><div class="small" style="margin-bottom:8px">Click a box, then press the key. <b>Global</b> keys work even when the app isn’t focused (desktop app). <b>MIDI</b>: click Learn, then press your pedal.</div><div id="hk-table"></div><div class="row"><button class="btn sm" id="hk-reset">Reset to defaults</button><span class="small" id="hk-midi">MIDI: not checked</span></div></div>
+     <div class="card pro-card" id="pro-card"><h4>ChordClicks Pro</h4><div id="pro-body"></div></div>
+     <div class="card"><h4>Helper server <span class="small" style="text-transform:none;letter-spacing:0">(web &amp; phone)</span></h4>
+      <div class="small">The web and phone builds can’t read Ultimate Guitar directly, so they go through a tiny relay you run for free: deploy <code>deploy/ug-proxy.worker.js</code> to Cloudflare or the repo to Render (<code>render.yaml</code>), then paste its address here. The desktop app doesn’t need it.</div>
+      <div class="row"><input id="px-url" class="grow" placeholder="https://chordclicks-ug.you.workers.dev"><button class="btn sm" id="px-test">Test</button></div><div class="small" id="px-msg"></div></div>
      <div class="card"><h4>Cloud sync <span class="small" style="text-transform:none;letter-spacing:0">(optional)</span></h4><div id="sync-body"></div></div>
      <div class="card"><h4>About</h4><div class="small"><b>ChordClicks</b> <span id="ver"></span><br>Created by Riley Mackay-Poirier <a href="https://www.506clicks.ca" target="_blank" rel="noreferrer" style="color:inherit;font-weight:700">@506clicks</a><br>Keys: ← → chords · Space start/stop · Esc leaves Clean mode</div></div>
     </div>
@@ -393,6 +399,7 @@
 <script src="src/lib/requests.js"></script>
 <script src="src/js/audio.js"></script>
 <script src="src/js/store.js"></script>
+<script src="src/js/pro.js"></script>
 <script src="src/js/ug.js"></script>
 <script src="src/js/fretboard.js"></script>
 <script src="src/js/overlay.js"></script>

@@ -17,7 +17,7 @@
 
   /* ================================================================ dialogs + menus */
   let onCancel = null;
-  function dialog(html, mount, cancel) { $('dlg').innerHTML = html; $('modal').classList.add('on'); onCancel = cancel || null; mount && mount(); }
+  function dialog(html, mount, cancel) { $('dlg').className = 'dlg'; $('dlg').innerHTML = html; $('modal').classList.add('on'); onCancel = cancel || null; mount && mount(); }
   function closeDlg() { $('modal').classList.remove('on'); onCancel = null; }
   $('modal').addEventListener('mousedown', e => { if (e.target === $('modal')) { const c = onCancel; closeDlg(); c && c(); } });
   function askText(title, val = '', ok = 'Save') {
@@ -215,14 +215,14 @@
   /* ---- trainer / timing / backing controls ---- */
   $('loopsel').onchange = e => { TR.loop = e.target.value; $('looprange').style.display = TR.loop === 'custom' ? '' : 'none'; paintLoop(); };
   $('loopfrom').onchange = $('loopto').onchange = paintLoop;
-  $('ramp').onchange = e => { TR.ramp = e.target.checked; $('rampset').style.display = TR.ramp ? '' : 'none'; if (!running) TR.speed = TR.ramp ? TR.rampStart : 100; if (TR.ramp && TR.loop === 'off') toast('Tip: pick a section to loop, then the tempo climbs each clean pass'); paintSpeed(); saveTR(); };
+  $('ramp').onchange = e => { if (e.target.checked && !RCC.pro.gate('trainer')) { e.target.checked = false; return; } TR.ramp = e.target.checked; $('rampset').style.display = TR.ramp ? '' : 'none'; if (!running) TR.speed = TR.ramp ? TR.rampStart : 100; if (TR.ramp && TR.loop === 'off') toast('Tip: pick a section to loop, then the tempo climbs each clean pass'); paintSpeed(); saveTR(); };
   $('rampstart').oninput = e => { TR.rampStart = +e.target.value; $('rampstart-v').textContent = TR.rampStart + '%'; if (!running) TR.speed = TR.rampStart; paintSpeed(); saveTR(); };
   async function setListen(on) {
     if (on) { try { unListen = await RCC.audio.listen.use({ chroma: ev => { if (!running || !prog[pi] || !ev.loud) return; fbCur.heard = true; const m = RCC.chroma.matchChord(ev.chroma, prog[pi].c); if (m.ok) fbCur.hit = true; const el = $('fb'); el.style.display = ''; el.className = 'tag ' + (m.ok ? 'ok' : 'miss'); el.textContent = m.ok ? '✓ ' + prog[pi].c + ' sounds right' : (m.heard ? 'Heard ' + m.heard : 'Listening…'); } }); TR.listen = true; }
       catch (e) { toast('Microphone unavailable: ' + (e.message || e)); TR.listen = false; $('listen').checked = false; } }
     else { unListen && unListen(); unListen = null; TR.listen = false; $('fb').style.display = 'none'; $('fbtxt').textContent = ''; }
   }
-  $('listen').onchange = e => setListen(e.target.checked);
+  $('listen').onchange = e => { if (e.target.checked && !RCC.pro.gate('trainer')) { e.target.checked = false; return; } setListen(e.target.checked); };
   $('accpat').onchange = e => { TR.acc = e.target.value; saveTR(); }; $('flash').onchange = e => { TR.flash = e.target.checked; saveTR(); };
   $('silent').onchange = e => { TR.silent = e.target.checked; saveTR(); }; $('sil-play').onchange = e => { TR.silPlay = Math.max(1, +e.target.value || 3); saveTR(); }; $('sil-mute').onchange = e => { TR.silMute = Math.max(1, +e.target.value || 1); saveTR(); };
   $('bstyle').innerHTML = Object.entries(RCC.backing.STYLES).map(([k, v]) => `<option value="${k}">${v}</option>`).join('');
@@ -251,7 +251,7 @@
   document.querySelectorAll('.nav').forEach(b => b.onclick = () => show(b.dataset.view));
 
   /* ================================================================ library UI */
-  let selKey = 'all'; const metaCache = new Map();
+  let selKey = 'all', selMode = false; const selIds = new Set(), metaCache = new Map();
   function songMeta(s) {
     const k = s.id + ':' + (s.text || '').length + ':' + (s.soloTab || '').length; let m = metaCache.get(k);
     if (!m) { m = { chords: SG.parseSheet(s.text || '').prog.length, tabs: SG.parseTabs((s.text || '') + '\n' + (s.soloTab || '')).sections.length }; metaCache.set(k, m); } return m;
@@ -276,15 +276,63 @@
     $('lib-ren').style.display = $('lib-del').style.display = $('lib-notes').style.display = $('lib-pdf').style.display = $('lib-print').style.display = isPl ? '' : 'none'; $('lib-play').disabled = $('lib-shuf').disabled = !list.length;
     $('songs').innerHTML = list.map((s, i) => {
       const m = songMeta(s), gc = s.genre ? Store.genreColor(s.genre) : 'var(--ac)';
-      return `<div class="song ${song && song.id === s.id ? 'cur' : ''}" data-id="${s.id}" style="--gc:${gc};animation-delay:${Math.min(i, 12) * 25}ms"><div class="acts">${isPl && sort === 'recent' && !q && flt === 'all' ? `<button data-act="up" title="Move earlier">▲</button><button data-act="dn" title="Move later">▼</button>` : ''}<button data-act="more" title="More">⋯</button></div><b>${esc(s.title)}</b><div class="ar">${esc(s.artist) || '&nbsp;'}</div><div class="meta">${s.genre ? `<span class="tag" style="color:${gc}">${esc(s.genre)}</span>` : ''}<span class="tag">${m.chords} chords</span>${RCC.lib2.badge(RCC.lib2.info(s))}${(s.strums || []).length ? '<span class="tag ok">strum ✓</span>' : ''}${m.tabs ? '<span class="tag ok">solo tab ✓</span>' : ''}</div></div>`;
+      return `<div class="song ${song && song.id === s.id ? 'cur' : ''} ${selMode && selIds.has(s.id) ? 'picked' : ''}" data-id="${s.id}" style="--gc:${gc};animation-delay:${Math.min(i, 12) * 25}ms">${selMode ? `<span class="pick">${selIds.has(s.id) ? '✓' : ''}</span>` : ''}<div class="acts">${isPl && sort === 'recent' && !q && flt === 'all' ? `<button data-act="up" title="Move earlier">▲</button><button data-act="dn" title="Move later">▼</button>` : ''}<button data-act="more" title="More">⋯</button></div><b>${esc(s.title)}</b><div class="ar">${esc(s.artist) || '&nbsp;'}</div><div class="meta">${s.genre ? `<span class="tag" style="color:${gc}">${esc(s.genre)}</span>` : ''}<span class="tag">${m.chords} chords</span>${RCC.lib2.badge(RCC.lib2.info(s))}${(s.strums || []).length ? '<span class="tag ok">strum ✓</span>' : ''}${m.tabs ? '<span class="tag ok">solo tab ✓</span>' : ''}</div></div>`;
     }).join('') || `<div class="empty"><b>${q ? 'No matches' : 'Nothing here yet'}</b>${q ? 'Try a different filter.' : 'Import a song from Ultimate Guitar in <u>Find</u>, or paste one on the Practice page.'}</div>`;
     document.querySelectorAll('#songs .song').forEach(e => {
-      e.onclick = ev => { const id = e.dataset.id; if (ev.target.dataset.act === 'up' || ev.target.dataset.act === 'dn') { const i = pl.songIds.indexOf(id); Store.reorderPlaylist(pl.id, i, i + (ev.target.dataset.act === 'up' ? -1 : 1)); return; } if (ev.target.dataset.act === 'more') { const r = ev.target.getBoundingClientRect(); songMenu(id, r.left, r.bottom + 4); return; } playList(list.map(x => x.id), id, $('lib-title').textContent); };
+      e.onclick = ev => { const id = e.dataset.id; if (selMode) { if (selIds.has(id)) selIds.delete(id); else selIds.add(id); paintBulk(list); e.classList.toggle('picked', selIds.has(id)); e.querySelector('.pick').textContent = selIds.has(id) ? '✓' : ''; return; } if (ev.target.dataset.act === 'up' || ev.target.dataset.act === 'dn') { const i = pl.songIds.indexOf(id); Store.reorderPlaylist(pl.id, i, i + (ev.target.dataset.act === 'up' ? -1 : 1)); return; } if (ev.target.dataset.act === 'more') { const r = ev.target.getBoundingClientRect(); songMenu(id, r.left, r.bottom + 4); return; } playList(list.map(x => x.id), id, $('lib-title').textContent); };
       e.oncontextmenu = ev => { ev.preventDefault(); songMenu(e.dataset.id, ev.clientX, ev.clientY); };
     });
     $('lib-play').onclick = () => playList(list.map(x => x.id), list[0] && list[0].id, $('lib-title').textContent);
     $('lib-shuf').onclick = () => { const ids = list.map(x => x.id).sort(() => Math.random() - .5); playList(ids, ids[0], $('lib-title').textContent + ' (shuffled)'); };
-    sugg(); fillImportTargets(); renderAcct();
+    paintBulk(list); sugg(); fillImportTargets(); renderAcct();
+  }
+  /* ---- multi-select: add to playlist / tag genre / delete several songs at once ---- */
+  function paintBulk(list) {
+    $('bulk').hidden = !selMode; $('lib-sel').textContent = selMode ? 'Done' : 'Select'; $('lib-sel').classList.toggle('on', selMode); if (!selMode) return;
+    $('bulk-n').textContent = selIds.size + ' selected';
+    $('bulk-pl').innerHTML = '<option value="">Add to playlist…</option>' + Store.lib.playlists.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('') + '<option value="__new">+ New playlist…</option>';
+    $('bulk-g').innerHTML = '<option value="">Set genre…</option>' + [...new Set([...Store.PRESET_GENRES, ...Store.genres().map(g => g.name)])].map(g => `<option>${esc(g)}</option>`).join('') + '<option value="__clear">(no genre)</option>';
+    $('bulk-all').onclick = () => { if (selIds.size === list.length) selIds.clear(); else list.forEach(s => selIds.add(s.id)); renderLib(); };
+  }
+  $('lib-sel').onclick = () => { selMode = !selMode; selIds.clear(); renderLib(); };
+  $('bulk-x').onclick = () => { selMode = false; selIds.clear(); renderLib(); };
+  $('bulk-pl').onchange = async e => {
+    let pid = e.target.value; e.target.value = ''; if (!pid || !selIds.size) return;
+    if (pid === '__new') { const n = await askText('New playlist', ''); if (!n) return; pid = Store.createPlaylist(n).id; }
+    const p = Store.playlist(pid); let n = 0; selIds.forEach(id => { if (!p.songIds.includes(id)) { Store.toggleInPlaylist(pid, id); n++; } }); toast(`Added ${n} song${n === 1 ? '' : 's'} to ${p.name}`);
+  };
+  $('bulk-g').onchange = e => { const g = e.target.value; e.target.value = ''; if (!g || !selIds.size) return; selIds.forEach(id => Store.updateSong(id, { genre: g === '__clear' ? '' : g })); toast('Genre updated'); };
+  $('bulk-del').onclick = async () => { if (!selIds.size) return; if (await askConfirm(`Delete ${selIds.size} song${selIds.size === 1 ? '' : 's'}?`)) { selIds.forEach(id => { Store.removeSong(id); if (song && song.id === id) song = null; }); selIds.clear(); toast('Deleted'); } };
+  /* ---- Pro card, helper server, first run ---- */
+  function paintPro() {
+    const st = RCC.pro.status(), box = $('pro-body'); if (!box) return;
+    box.innerHTML = `<div class="row" style="margin:0 0 8px"><span class="pro-tag big">${st.kind === 'free' ? 'FREE' : 'PRO'}</span><b>${esc(st.label)}</b></div>
+      ${st.kind === 'pro' ? `<div class="small">Thanks for supporting ChordClicks. Your key works offline on any of your devices.</div><div class="row"><button class="btn sm" id="pro-off">Remove key from this device</button></div>`
+      : `<ul class="pro-list compact">${RCC.pro.FEATURES.map(f => `<li><b>${esc(f[1])}</b></li>`).join('')}</ul><div class="row">${RCC.pro.trialUsed() ? '' : `<button class="btn p" id="pro-try">Start ${RCC.pro.TRIAL_DAYS}-day trial</button>`}<a class="btn ${RCC.pro.trialUsed() ? 'p' : ''}" href="${RCC.pro.BUY_URL}" target="_blank" rel="noreferrer">Buy Pro · ${RCC.pro.PRICE}</a><button class="btn" id="pro-enter">Enter key</button></div>`}`;
+    const t = $('pro-try'); if (t) t.onclick = () => { RCC.pro.startTrial(); toast('Pro trial started'); };
+    const k = $('pro-enter'); if (k) k.onclick = () => RCC.pro.keyDialog();
+    const o = $('pro-off'); if (o) o.onclick = async () => { if (await askConfirm('Remove the Pro key from this device?', 'Remove')) RCC.pro.deactivate(); };
+    // PRO tags on gated controls
+    const mark = (sel, f) => document.querySelectorAll(sel).forEach(el => RCC.pro.mark(el, f));
+    mark('#solo-mode [data-v=score], #solo-mode [data-v=wait]', 'score'); mark('#lp-rec', 'looper'); mark('#vcam', 'stream'); mark('#lib-pdf, #lib-notes', 'library');
+    document.querySelectorAll('#ramp, #listen').forEach(i => RCC.pro.mark(i.closest('label'), 'trainer'));
+    document.querySelectorAll('#ln-tabs [data-t=changes]').forEach(el => RCC.pro.mark(el, 'trainer'));
+  }
+  function paintProxy() {
+    let v = ''; try { v = localStorage.getItem('rcc-proxy') || ''; } catch (e) {} $('px-url').value = v;
+    $('px-url').onchange = e => { const u = e.target.value.trim().replace(/\/+$/, ''); try { localStorage.setItem('rcc-proxy', u); } catch (err) {} $('px-msg').textContent = u ? 'Saved. Ultimate Guitar search will go through it.' : 'Cleared.'; };
+    $('px-test').onclick = async () => { const u = $('px-url').value.trim().replace(/\/+$/, ''); if (!/^https:\/\//.test(u)) { $('px-msg').textContent = 'Address must start with https://'; return; } $('px-msg').textContent = 'Testing…'; try { const r = await fetch(u + '/api/health', { signal: AbortSignal.timeout(8000) }).then(x => x.json()); $('px-msg').textContent = r && r.ok ? '✓ Helper server is answering.' : 'That address answered, but not like a ChordClicks helper.'; } catch (e) { $('px-msg').textContent = 'No answer from that address.'; } };
+  }
+  function welcome() {
+    const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone, native = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()), phone = matchMedia('(pointer:coarse)').matches;
+    dialog(`<svg class="logo" viewBox="0 0 64 64"><use href="#logo"/></svg><h2>Welcome to ChordClicks</h2><p class="small" style="line-height:1.5;margin:4px 0 12px">Your chords on your camera, a tuner, play-along scoring, scales, lessons and a pedalboard — all in one practice room. Here’s a good first five minutes:</p>
+      <div class="wl-grid"><button class="wl" data-go="find"><b>1 · Find a song</b><span>Search Ultimate Guitar or paste any chord sheet.</span></button><button class="wl" data-go="tuner"><b>2 · Tune up</b><span>Plug in or use the mic. Pluck one string at a time.</span></button><button class="wl" data-go="solo"><b>3 · Try the demo solo</b><span>Watch notes scroll, then let it score you.</span></button><button class="wl" data-go="learn"><b>4 · Learn something</b><span>Chords, fingerpicking, theory, ear training.</span></button></div>
+      ${!R && phone && !standalone && !native ? '<div class="hint" style="margin-top:10px"><b>Tip:</b> add ChordClicks to your home screen (Share → Add to Home Screen) for full screen and offline use.</div>' : ''}
+      <div class="row" style="justify-content:space-between;margin-top:14px"><span class="small">${RCC.pro.trialUsed() ? '' : `Everything is unlocked for ${RCC.pro.TRIAL_DAYS} days when you start the Pro trial — no card.`}</span><button class="btn p" id="wl-x">Let’s go</button></div>`, () => {
+      $('dlg').classList.add('wide'); P.welcomed = true; saveP();
+      $('dlg').querySelectorAll('.wl').forEach(b => b.onclick = () => { closeDlg(); show(b.dataset.go); if (b.dataset.go === 'solo') $('solo-demo').click(); });
+      $('wl-x').onclick = closeDlg;
+    });
   }
   function songMenu(id, x, y) {
     const s = Store.song(id); if (!s) return;
@@ -316,7 +364,8 @@
   Store.on(() => { if ($('v-library').classList.contains('on')) renderLib(); else { sugg(); fillImportTargets(); } renderAcct(); renderNewChords(); });
 
   /* ================================================================ Ultimate Guitar (own UI, nothing from the site is displayed) */
-  const UG = { q: '', type: 'chords', page: 1, results: [], more: false, sel: -1, cur: null, busy: false };
+  const UG = { q: '', type: 'chords', page: 1, results: [], more: false, sel: -1, cur: null, busy: false, sort: 'best' };
+  const ugOrder = list => { const k = UG.sort, sc = r => r.rating * Math.log10((r.votes || 0) + 10); return list.slice().sort((a, b) => k === 'rating' ? b.rating - a.rating || b.votes - a.votes : k === 'votes' ? b.votes - a.votes : k === 'version' ? b.version - a.version : sc(b) - sc(a)); };
   function fillImportTargets() {
     $('genres').innerHTML = [...new Set([...Store.PRESET_GENRES, ...Store.genres().map(g => g.name)])].map(g => `<option value="${esc(g)}">`).join('');
     const cur = $('imp-pl').value; $('imp-pl').innerHTML = '<option value="">No playlist</option>' + Store.lib.playlists.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join(''); $('imp-pl').value = cur; $('imp-genre').value = $('imp-genre').value || P.impGenre || '';
@@ -327,7 +376,8 @@
     const box = $('ug-results');
     if (UG.busy === 'search' && !UG.results.length) { box.innerHTML = `<div class="empty"><b>Searching…</b>${esc(UG.q)}</div>`; return; }
     if (!UG.results.length) { box.innerHTML = `<div class="empty"><b>${UG.q ? 'No results' : 'Search Ultimate Guitar'}</b>${UG.q ? 'Try fewer words, or switch between Chords, Tabs and All.' : 'Type a song or artist above. Versions open here — no website, no ads.'}</div>`; return; }
-    box.innerHTML = UG.results.map((r, i) => `<div class="ugr ${i === UG.sel ? 'on' : ''}" data-i="${i}"><div class="grow" style="min-width:0"><b>${esc(r.title)}</b><div class="ar">${esc(r.artist)}${r.version > 1 ? ' · ver ' + r.version : ''}${r.key ? ' · ' + esc(r.key) : ''}</div></div><div class="rt"><span class="tag">${esc(r.type)}</span><div>${stars(r.rating)} <span>${r.votes ? r.votes.toLocaleString() : ''}</span></div></div></div>`).join('')
+    const shown = ugOrder(UG.results).map(r => UG.results.indexOf(r));
+    box.innerHTML = shown.map(i => { const r = UG.results[i]; return `<div class="ugr ${i === UG.sel ? 'on' : ''}" data-i="${i}"><div class="grow" style="min-width:0"><b>${esc(r.title)}</b><div class="ar">${esc(r.artist)}${r.version > 1 ? ' · ver ' + r.version : ''}${r.key ? ' · ' + esc(r.key) : ''}</div></div><div class="rt"><span class="tag">${esc(r.type)}</span><div>${stars(r.rating)} <span>${r.votes ? r.votes.toLocaleString() : ''}</span></div></div></div>`; }).join('')
       + (UG.more ? `<div class="row" style="justify-content:center;margin:10px 0 4px"><button class="btn sm" id="ug-more" ${UG.busy ? 'disabled' : ''}>${UG.busy ? 'Loading…' : 'More results'}</button></div>` : '');
     box.querySelectorAll('.ugr').forEach(e => e.onclick = () => ugOpen(+e.dataset.i));
     const m = $('ug-more'); if (m) m.onclick = () => ugSearch(UG.q, UG.page + 1);
@@ -356,6 +406,7 @@
     $('ug-imp').onclick = () => ugImport(t); $('ug-ext').onclick = () => window.open(t.url, '_blank');
   }
   function ugImport(x) {
+    if (!RCC.pro.canAddSong(Store.lib.songs.length) && !Store.lib.songs.some(s => s.title.toLowerCase() === String(x.title).toLowerCase())) { RCC.pro.upsell('library'); return; }
     const genre = $('imp-genre').value.trim(); P.impGenre = genre; saveP();
     const saved = Store.addSong({ title: x.title, artist: x.artist, text: x.text, strums: x.strums || [], pat: '', bpm: x.bpm || 0, genre, meta: x.meta || {}, url: x.url });
     const pid = $('imp-pl').value; if (pid && Store.playlist(pid) && !Store.playlist(pid).songIds.includes(saved.id)) Store.toggleInPlaylist(pid, saved.id);
@@ -364,6 +415,7 @@
     playList([saved.id], saved.id, pid ? Store.playlist(pid).name : '');
   }
   $('ug-go').onclick = () => ugSearch($('ug-q').value); $('ug-q').onkeydown = e => { if (e.key === 'Enter') ugSearch($('ug-q').value); };
+  $('ug-sort').onchange = e => { UG.sort = e.target.value; ugRender(); };
   document.querySelectorAll('#ug-type button').forEach(b => b.onclick = () => { UG.type = b.dataset.v; document.querySelectorAll('#ug-type button').forEach(x => x.classList.toggle('on', x === b)); if (UG.q) ugSearch(UG.q); });
   $('find-off-lib').onclick = () => show('library');
   $('ug').onclick = () => {
@@ -430,7 +482,7 @@
   let vOn = false, vt = null;
   if (R) {
     R.onStatus(m => { vOn = m.on; $('vmsg').textContent = m.text; $('vstat').textContent = m.on ? 'Virtual cam live' : 'Virtual cam off'; $('vstat').classList.toggle('on', m.on); $('vcam').textContent = m.on ? 'Stop virtual camera' : 'Start virtual camera'; clearInterval(vt); if (m.on) vt = setInterval(() => { try { if (cv.width === 1280) R.frame(cx.getImageData(0, 0, 1280, 720).data.buffer); } catch (e) {} }, 33); });
-    $('vcam').onclick = () => vOn ? R.stop() : R.start();
+    $('vcam').onclick = () => { if (vOn) R.stop(); else RCC.pro.gate('stream', () => R.start()); };
     $('vsetup').onclick = async () => { const r = await R.setupVcam(); toast(r.ok ? 'Setup started – approve the Windows prompt, then restart your video app.' : (r.error || 'Setup failed')); };
   } else { $('vcam').disabled = $('vsetup').disabled = true; $('vmsg').textContent = 'Virtual camera needs the desktop app.'; }
 
@@ -542,10 +594,12 @@
     RCC.gear.init({ toast, bpm: () => P.bpm, beats: () => +$('beats').value });
     if (RCC.record) RCC.record.init({ toast, setOutputSize, flipCam, camLive, startCam, setMode, modes: OV.MODES, P, saveP, running: () => running, toggle, songTitle: () => (song && song.title) || '', out: cv, renderStreamUI });
     RCC.scales.init({ audio, toast, track: o => Store.track(o), drill: (text, name) => { if (RCC.solo.openTab(text, name)) show('solo'); }, accent: () => P.accent, jam: (text, title) => { loadSong(tempSong(title, text, { artist: 'Scale Lab' })); show('practice'); } });
-    await Store.init(); RCC.controls.init();
+    await Store.init(); await RCC.pro.init(); RCC.controls.init();
     renderAcct(); renderLib(); renderStreamUI();
     if (R) R.version().then(v => { $('ver').textContent = $('ver2').textContent = 'v' + v; });
-    paintOnline();
+    paintOnline(); paintPro(); paintProxy(); RCC.pro.onChange(() => { paintPro(); renderLib(); });
+    $('sup-pro').onclick = () => (RCC.pro.has() ? show('settings') : RCC.pro.upsell());
+    if (!P.welcomed) setTimeout(welcome, 600);
     $('sup-share').onclick = async () => { const url = 'https://www.506clicks.ca/projects/chordclicks/', text = 'ChordClicks — free guitar practice app with your chords on camera'; try { if (navigator.share) await navigator.share({ title: 'ChordClicks', text, url }); else { await navigator.clipboard.writeText(url); toast('Link copied — thanks for sharing!'); } } catch (e) {} };
     if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => {});
     loadSong(tempSong('Sample', '[Verse]\nAm        F\nPaste a song from Ultimate Guitar here\nC         G\nand the chords show up on your camera'));

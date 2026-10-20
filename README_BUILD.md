@@ -43,6 +43,8 @@ synthetic microphone input.
 | Hotkeys, global hotkeys, MIDI foot pedal, cloud sync | Settings view |
 | Ultimate Guitar search / preview / import (`ug:fetch` IPC on desktop, native HTTP on phones, hidden webview fallback) | Find view (`ug.js`) |
 | Fingerpicking patterns, tab generator for Solo | Learn view (`fingerpick.js`) |
+| Pro tier: gates, trial, offline key check (`pro.js`), key tool (`scripts/licence.mjs`) | Settings → ChordClicks Pro |
+| Ultimate Guitar relay for web/phone (`/api/ug` in `server/server.js`, `deploy/ug-proxy.worker.js`) | Settings → Helper server |
 | Looper capture on the audio thread | `capture-worklet.js` (+ ScriptProcessor fallback) |
 | Offline: online/offline events, service worker, saved songs only | `app.js` paintOnline, `sw.js` |
 | Record mode: portrait/landscape output, countdown, trim (real-time re-encode), export via Capacitor Share → Web Share → Save dialog → download | `record.js`, `overlay.js` setSize, `audio.js` setMicRecorded |

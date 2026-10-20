@@ -30,6 +30,7 @@
       const check = () => { const t = $('im-x').value; if (SG.looksLikeChordPro && SG.looksLikeChordPro(t)) $('im-msg').textContent = 'ChordPro detected — it will be converted to a chord sheet.'; else { const n = SG.parseSheet(t).prog.length; $('im-msg').textContent = n ? n + ' chords found.' : t.trim() ? 'No chords found. That’s fine — add them later with Edit.' : ''; } };
       $('im-x').oninput = check; $('im-c').onclick = a.closeDlg; check();
       $('im-ok').onclick = () => {
+        if (RCC.pro && !RCC.pro.canAddSong(S().lib.songs.length)) { a.closeDlg(); RCC.pro.upsell('library'); return; }
         let text = $('im-x').value, title = $('im-t').value.trim(), artist = $('im-a').value.trim(); if (!text.trim()) { $('im-msg').textContent = 'Paste some text first.'; return; }
         if (SG.looksLikeChordPro && SG.looksLikeChordPro(text)) { const c = SG.fromChordPro(text); text = c.text; title = title || c.title; artist = artist || c.artist; }
         const found = SG.findStrumsInText(text), s = S().addSong({ title: title || 'Untitled', artist, text, strums: found, genre: $('im-g').value.trim() });
@@ -63,7 +64,7 @@
 
   /* ================================================================ setlists */
   function openNotes(pid) {
-    const a = A(), p = S().playlist(pid); if (!p) return;
+    const a = A(), p = S().playlist(pid); if (!p) return; if (RCC.pro && !RCC.pro.gate('library')) return;
     a.dialog(`<h2>Gig notes · ${esc(p.name)}</h2><div class="small">Venue, start time, gear, cues… printed on the set sheet.</div><textarea id="gn" rows="9" style="width:100%;margin-top:10px" placeholder="Venue: …&#10;Soundcheck 6:30&#10;Capo songs first. Water on stage.">${esc(p.notes || '')}</textarea><div class="row" style="justify-content:flex-end"><button class="btn" id="gn-c">Cancel</button><button class="btn p" id="gn-ok">Save notes</button></div>`, () => { $('gn-c').onclick = a.closeDlg; $('gn-ok').onclick = () => { S().setPlaylistNotes(pid, $('gn').value); a.closeDlg(); a.toast('Notes saved'); }; });
   }
   function setHtml(p) {
@@ -72,7 +73,7 @@
     return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(p.name)}</title><style>${css}</style></head><body><h1>${esc(p.name)}</h1><div class="sub">${songs.length} songs · ${new Date().toLocaleDateString()}</div>${p.notes ? `<div class="notes">${esc(p.notes)}</div>` : ''}<ol class="list">${songs.map((s, i) => `<li><b>${i + 1}</b><span><b style="color:#111;min-width:0">${esc(s.title)}</b> <span style="color:#666">${esc(s.artist || '')}</span> <span style="color:#7c3aed">${esc((s.meta && s.meta.key) || '')}${s.meta && s.meta.capo ? ' · capo ' + esc(s.meta.capo) : ''}</span></span></li>`).join('')}</ol>${body}</body></html>`;
   }
   async function exportSet(pid, how) {
-    const a = A(), p = S().playlist(pid); if (!p) return; if (!p.songIds.length) { a.toast('This playlist is empty'); return; }
+    const a = A(), p = S().playlist(pid); if (!p) return; if (RCC.pro && !RCC.pro.gate('library')) return; if (!p.songIds.length) { a.toast('This playlist is empty'); return; }
     const html = setHtml(p), R = window.rcc;
     if (how !== 'print' && R && R.savePdf) { const r = await R.savePdf(p.name.replace(/[^\w\- ]/g, '_') + '.pdf', html); a.toast(r && r.ok ? 'PDF saved: ' + r.path : r && r.error ? r.error : 'Cancelled'); return; }
     const fr = document.createElement('iframe'); fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0'; fr.srcdoc = html; document.body.appendChild(fr);
