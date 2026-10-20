@@ -38,6 +38,7 @@
     $('cc-go').onclick = startChange; $('cc-stop').onclick = () => finishChange(true);
   }
   async function startChange() {
+    if (RCC.pro && !RCC.pro.gate('trainer')) return;
     if (cc.a === cc.b) { D.toast('Pick two different chords'); return; }
     const run = (cc.run = { target: cc.a, t0: 0, times: [], tStart: 0, ok: 0, done: false, begun: false });
     $('cc-stage').style.display = 'block'; $('cc-res').style.display = 'none'; $('cc-go').disabled = true;
@@ -89,7 +90,7 @@
       <div><button class="btn p big" id="ear-play">▶ ${ear.q ? 'Play again' : 'Start round'}</button> <button class="btn" id="ear-skip" ${ear.q ? '' : 'disabled'}>Skip</button></div></div>
      <div class="small" id="ear-msg" style="min-height:20px;margin-top:6px"></div><div class="big-answer" id="ear-ans"></div></div>`;
     $('ear-kind').querySelectorAll('button').forEach(b => b.onclick = () => { ear.kind = b.dataset.v; ear.q = null; ear.score = ear.n = ear.streak = 0; earUI(); });
-    $('ear-lvl').querySelectorAll('button').forEach(b => b.onclick = () => { ear.level = +b.dataset.v; ear.q = null; ear.score = ear.n = 0; earUI(); });
+    $('ear-lvl').querySelectorAll('button').forEach(b => b.onclick = () => { if (+b.dataset.v > 1 && RCC.pro && !RCC.pro.gate('trainer')) return; ear.level = +b.dataset.v; ear.q = null; ear.score = ear.n = 0; earUI(); });
     $('ear-dir') && $('ear-dir').querySelectorAll('button').forEach(b => b.onclick = () => { ear.dir = b.dataset.v; earUI(); });
     $('ear-play').onclick = () => (ear.q ? earPlay() : earNext()); $('ear-skip').onclick = () => { if (ear.q && !ear.answered) { ear.n++; ear.streak = 0; } earNext(); };
     if (ear.q) earAnswers();
@@ -169,13 +170,14 @@
 
   /* ================================================================ shell */
   function show(t) {
-    tab = t; if (stopChange) stopChange();
+    tab = t; if (stopChange) stopChange(); if (t !== 'finger' && RCC.fingerpick) RCC.fingerpick.stop();
     document.querySelectorAll('#ln-tabs button').forEach(b => b.classList.toggle('on', b.dataset.t === t)); document.querySelectorAll('.ln-pane').forEach(p => p.classList.toggle('on', p.id === 'ln-' + t));
-    if (t === 'chords') RCC.chords.redraw(); else if (t === 'changes' && !(cc.run && !cc.run.done)) changesUI(); else if (t === 'ear') earUI(); else if (t === 'theory') theoryUI(); else if (t === 'progress') progressUI();
+    if (t === 'chords') RCC.chords.redraw(); else if (t === 'changes' && !(cc.run && !cc.run.done)) changesUI(); else if (t === 'ear') earUI(); else if (t === 'finger') RCC.fingerpick.redraw(); else if (t === 'theory') theoryUI(); else if (t === 'progress') progressUI();
   }
   function init(deps) {
     D = deps; D.jam = deps.jam; document.querySelectorAll('#ln-tabs button').forEach(b => b.onclick = () => show(b.dataset.t));
     RCC.chords.build($('ln-chords'), { accent: D.accent, useChord: n => D.useChord && D.useChord(n) });
+    if (RCC.fingerpick) RCC.fingerpick.init(D);
   }
   RCC.learn = { init, show, redraw: () => show(tab), setDeps: o => Object.assign(D, o), openChord: n => { RCC.chords.select(n); show('chords'); } };
 })();

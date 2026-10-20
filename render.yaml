@@ -1,0 +1,30 @@
+# One-click deploy of the ChordClicks helper server (cloud sync + Ultimate Guitar relay) on Render's free tier.
+# https://render.com → New → Blueprint → point it at this repo. Then paste the service URL into
+# ChordClicks → Settings → Helper server (and Cloud sync).
+services:
+  - type: web
+    name: chordclicks-server
+    runtime: node
+    plan: free
+    buildCommand: "true"
+    startCommand: node server/server.js
+    envVars:
+      - key: DATA_DIR
+        value: /var/data
+      # Pro checkout (see docs/CHECKOUT.md). Fill these in the Render dashboard; sync: false keeps them out of the blueprint.
+      - key: LICENCE_PRIVATE_JWK
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: MAIL_FROM
+        sync: false
+      - key: ADMIN_TOKEN
+        generateValue: true
+    disk:
+      name: data
+      mountPath: /var/data
+      sizeGB: 1

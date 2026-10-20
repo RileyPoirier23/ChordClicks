@@ -200,3 +200,29 @@ test('chord detection from synthetic guitar chords', () => {
   }
   assert.ok(C.chromaFromMags(new Float64Array(8192), 48000, 16384).every(v => v === 0));
 });
+
+test('Ultimate Guitar numeric strumming (measures) + tempo/subdivision', () => {
+  const r = S.extractStrumsFromJSON({ strummings: [{ part: 'Verse', bpm: 87, denuminator: 8, is_triplet: 0, measures: [{ measure: 1 }, { measure: 101 }, { measure: 1 }, { measure: 2 }, { measure: 101 }, { measure: 2 }, { measure: 1 }, { measure: 2 }] }] });
+  assert.strictEqual(r.length, 1); assert.strictEqual(r[0].pat, 'D-DU-UDU'); assert.strictEqual(r[0].bpm, 87); assert.strictEqual(r[0].sub, 2); assert.strictEqual(r[0].part, 'Verse');
+});
+test('capo / tuning / tempo / key written in the sheet text', () => {
+  const m = S.findMetaInText('Wonderwall\nTuning: Standard (E A D G B E)\nCapo: 2nd fret\nTempo: 87\nKey: F#m\n\n[Intro]\nEm7 G');
+  assert.deepStrictEqual(m, { tuning: 'Standard E A D G B E', capo: '2', bpm: 87, key: 'F#m' });
+  assert.strictEqual(S.findMetaInText('no capo here').capo, '0');
+});
+test('tab techniques: bends keep one note, slides/hammer-ons link to their target', () => {
+  const t = S.parseTabs('e|--7b9r7--5/7--7h9p7--3~--8b--|\nB|------------------------------|\nG|------------------------------|\nD|------------------------------|\nA|------------------------------|\nE|------------------------------|').sections[0];
+  const n = t.events.map(e => e.notes[0]);
+  assert.strictEqual(n.length, 8);
+  assert.deepStrictEqual([n[0].fret, n[0].bend, n[0].release, n[0].tech], [7, 2, 7, 'b']);
+  assert.deepStrictEqual(n[1].to, { fret: 7, tech: '/' }); assert.strictEqual(n[2].tech, '/');
+  assert.deepStrictEqual(n[3].to, { fret: 9, tech: 'h' }); assert.deepStrictEqual(n[4].to, { fret: 7, tech: 'p' });
+  assert.strictEqual(n[6].tech, '~'); assert.strictEqual(n[7].bend, 2);
+});
+test('pitch refinement keeps the YIN estimate and sharpens it on a noisy guitar-like tone', () => {
+  const sr = 48000, f = 110.3, buf = new Float32Array(8192); let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647 - .5;
+  for (let i = 0; i < buf.length; i++) buf[i] = .3 * Math.sin(2 * Math.PI * f * i / sr) + .15 * Math.sin(2 * Math.PI * 2 * f * i / sr) + .08 * Math.sin(2 * Math.PI * 3 * f * i / sr) + .02 * rnd();
+  const y = P.yin(buf, sr, { minF: 57, maxF: 1500, threshold: .13 }), fr = sr / P.refine(buf, sr / y.freq);
+  assert.ok(Math.abs(1200 * Math.log2(fr / f)) < 1.5, 'refined within 1.5 cents: ' + fr);
+  assert.ok(Math.abs(1200 * Math.log2(fr / f)) <= Math.abs(1200 * Math.log2(y.freq / f)) + .5);
+});

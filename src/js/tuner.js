@@ -7,7 +7,7 @@
   const save = () => { try { localStorage.setItem('rcc-tuner', JSON.stringify(cfg)); } catch (e) {} };
   let D, running = false, ctx, src, reconn, an, filters = {}, timer = null, tunedSet = new Set(), intn = null, intnRes = {};
   let lockIdx = 0, hist = [], lastGood = 0, inTuneSince = 0, shown = { cents: 0, ok: false, has: false };
-  let needle = 0, hitIdx = -1, outl = 0;
+  let needle = 0, hitIdx = -1, outl = 0, floor = 1, emaC = null, lastStr = -1, strHold = 0;
   const tuning = () => T.TUNINGS[cfg.tuning].notes;
   const gateThr = () => 0.003 + Math.pow(cfg.gate / 100, 2) * 0.1;
 
@@ -70,7 +70,7 @@
   }
   function stop() {
     if (!running) return; running = false; clearInterval(timer); try { src && src.disconnect(filters.hp1); an && an.disconnect(); } catch (e) {} RCC.audio.input.release(); intn = null; paintIntn();
-    $('tonbtn').textContent = 'Start tuner'; $('lvl').style.width = '0'; hitIdx = -1; shown.has = false; paintPegs(); $('tnote').textContent = '—'; $('tinfo').textContent = 'Pick your input, then press Start';
+    $('tonbtn').textContent = 'Start tuner'; $('lvl').style.width = '0'; if ($('cbar')) $('cbar').hidden = true; hitIdx = -1; shown.has = false; paintPegs(); $('tnote').textContent = '—'; $('tinfo').textContent = 'Pick your input, then press Start';
   }
 
   const buf = new Float32Array(8192);
@@ -82,28 +82,40 @@
     if (rms >= thr) {
       const fsT = tuning().map(n => T.noteToFreq(n, cfg.a4)); let opts = { minF: Math.max(25, Math.min(...fsT) * .7), maxF: Math.min(1500, Math.max(...fsT) * 2.2), threshold: .13 };
       if (cfg.mode === 'lock') { const f = T.noteToFreq(tuning()[lockIdx], cfg.a4); opts = { minF: f * .7, maxF: f * 1.6, threshold: .13 }; }
-      const r = P.yin(buf, sr, opts); freq = r.freq; prob = r.prob;
+      // detect on a half-rate copy (4x cheaper, phones stay smooth), then check the octave and refine on the full-rate buffer
+      const r = P.yin(P.decimate(buf, 2), sr / 2, opts); prob = r.prob;
+      if (r.freq > 0) { let tau = r.tau * 2; if (cfg.mode !== 'lock') tau = P.octaveCheck(buf, tau, sr / opts.minF); freq = sr / P.refine(buf, tau); }
     }
+    floor = rms < floor ? rms : floor * .9999 + rms * .0001;        // slow noise-floor estimate, keeps hiss from reading as a note
+    if (rms < Math.max(thr, Math.min(floor * 1.6, .02))) freq = -1;
     const now = performance.now();
     if (freq > 0 && prob > .85) {
       // ignore one-off octave/outlier jumps; accept a new note once it persists for 3 readings
-      if (hist.length >= 3) { const m0 = P.median(hist); if (Math.abs(1200 * Math.log2(freq / m0)) > 80) { if (++outl < 3) return; hist = []; outl = 0; } else outl = 0; }
+      if (hist.length >= 3) { const m0 = P.median(hist); if (Math.abs(1200 * Math.log2(freq / m0)) > 80) { if (++outl < 3) return; hist = []; emaC = null; outl = 0; } else outl = 0; }
       hist.push(freq); if (hist.length > 5) hist.shift();
       const med = P.median(hist), good = hist.filter(f => Math.abs(1200 * Math.log2(f / med)) < 40), f = good.reduce((a, b) => a + b, 0) / good.length;
       lastGood = now; show(f, now);
-    } else if (now - lastGood > 1200) { hist = []; shown.has = false; hitIdx = cfg.mode === 'lock' ? lockIdx : -1; if (running) { $('tnote').textContent = '—'; $('tinfo').textContent = rms < thr ? 'Listening… pluck a string' : 'Hmm, not a clear note — pluck one string'; } paintPegs(); }
+    } else if (now - lastGood > 1200) { hist = []; emaC = null; lastStr = -1; shown.has = false; hitIdx = cfg.mode === 'lock' ? lockIdx : -1; if (running) { $('tnote').textContent = '—'; $('tinfo').textContent = rms < thr ? 'Listening… pluck a string' : 'Hmm, not a clear note — pluck one string'; const cb = $('cbar'); if (cb) cb.hidden = true; } paintPegs(); }
   }
   function show(f, now) {
     let name, oct, cents, target;
     if (cfg.mode === 'chrom') { const n = T.nearestNote(f, cfg.a4); name = n.name; oct = n.octave; cents = n.cents; hitIdx = -1; target = T.noteToFreq(name + oct, cfg.a4); }
     else if (cfg.mode === 'lock') { const note = tuning()[lockIdx]; target = T.noteToFreq(note, cfg.a4); cents = 1200 * Math.log2(f / target); hitIdx = lockIdx; const m = /^([A-G]#?)(\d)$/.exec(note); name = m[1]; oct = +m[2]; }
-    else { const b = T.nearestString(f, tuning(), cfg.a4); if (Math.abs(b.cents) > 650) { const n = T.nearestNote(f, cfg.a4); name = n.name; oct = n.octave; cents = n.cents; hitIdx = -1; target = T.noteToFreq(name + oct, cfg.a4); } else { cents = b.cents; target = b.target; hitIdx = b.index; const m = /^([A-G]#?)(\d)$/.exec(b.note); name = m[1]; oct = +m[2]; } }
-    const inTune = Math.abs(cents) <= 4; if (inTune) { if (!inTuneSince) inTuneSince = now; } else inTuneSince = 0;
+    else {
+      let b = T.nearestString(f, tuning(), cfg.a4);
+      // stick with the string you were tuning unless the pitch is clearly closer to another one for a few readings
+      if (lastStr >= 0 && b.index !== lastStr) { const keep = T.noteToFreq(tuning()[lastStr], cfg.a4), kc = 1200 * Math.log2(f / keep); if (Math.abs(kc) < 350 && ++strHold < 4) b = { index: lastStr, note: tuning()[lastStr], target: keep, cents: kc }; else strHold = 0; } else strHold = 0;
+      if (Math.abs(b.cents) > 650) { const n = T.nearestNote(f, cfg.a4); name = n.name; oct = n.octave; cents = n.cents; hitIdx = -1; target = T.noteToFreq(name + oct, cfg.a4); lastStr = -1; }
+      else { cents = b.cents; target = b.target; hitIdx = b.index; lastStr = b.index; const m = /^([A-G]#?)(\d)$/.exec(b.note); name = m[1]; oct = +m[2]; }
+    }
+    emaC = emaC == null || Math.abs(cents - emaC) > 25 ? cents : emaC * .6 + cents * .4; cents = emaC;
+    const inTune = Math.abs(cents) <= (shown.ok ? 6 : 3); if (inTune) { if (!inTuneSince) inTuneSince = now; } else inTuneSince = 0;
     shown = { cents, ok: inTune && now - inTuneSince > 250, has: true }; if (shown.ok && hitIdx >= 0) tunedSet.add(hitIdx); if (intn) feedIntn(f, now);
     $('tnote').innerHTML = name + '<small>' + oct + '</small>'; $('tnote').style.color = shown.ok ? 'var(--gr)' : '';
-    const dir = shown.ok ? 'In tune ✓' : Math.abs(cents) < 4 ? 'Almost…' : cents < 0 ? 'Too low – tune up ↑' : 'Too high – tune down ↓';
-    $('tinfo').textContent = f.toFixed(1) + ' Hz · ' + (cents > 0 ? '+' : '') + cents.toFixed(0) + '¢ · ' + dir;
+    const dir = shown.ok ? 'In tune ✓' : Math.abs(cents) < 4 ? 'Almost…' : Math.abs(cents) < 12 ? (cents < 0 ? 'A touch low ↑' : 'A touch high ↓') : cents < 0 ? 'Too low – tune up ↑' : 'Too high – tune down ↓';
+    $('tinfo').textContent = f.toFixed(1) + ' Hz · ' + (cents > 0 ? '+' : '') + cents.toFixed(Math.abs(cents) < 10 ? 1 : 0) + '¢ · ' + dir;
     document.querySelector('.tuner-main').style.setProperty('--tune', shown.ok ? '#34d399' : Math.abs(cents) < 15 ? '#fbbf24' : '#8b5cf6');
+    const cb = $('cbar'); if (cb) { cb.hidden = false; cb.querySelector('i').style.left = (50 + Math.max(-50, Math.min(50, cents))) + '%'; cb.classList.toggle('ok', shown.ok); $('cbar-v').textContent = (cents > 0 ? '+' : '') + cents.toFixed(Math.abs(cents) < 10 ? 1 : 0); $('cbar-dir').textContent = shown.ok ? '✓' : cents < -3 ? '↑ tighten' : cents > 3 ? '↓ loosen' : '·'; }
     paintPegs();
   }
 
@@ -139,7 +151,7 @@
     for (let v = -50; v <= 50; v += 10) { const a = A(v), big = v % 50 === 0 || v === 0; c.strokeStyle = 'rgba(255,255,255,' + (big ? .8 : .4) + ')'; c.lineWidth = big ? 4 : 2; c.beginPath(); c.moveTo(cx + Math.cos(a) * (R - 30), cy + Math.sin(a) * (R - 30)); c.lineTo(cx + Math.cos(a) * (R - 52), cy + Math.sin(a) * (R - 52)); c.stroke(); }
     c.fillStyle = 'rgba(255,255,255,.55)'; c.font = '600 24px system-ui'; c.textAlign = 'center';
     [['♭', -50], ['0', 0], ['♯', 50]].forEach(([t, v]) => c.fillText(t, cx + Math.cos(A(v)) * (R - 82), cy + Math.sin(A(v)) * (R - 82) + 8));
-    const target = shown.has ? Math.max(-50, Math.min(50, shown.cents)) : 0; needle += (target - needle) * .18;
+    const target = shown.has ? Math.max(-50, Math.min(50, shown.cents)) : 0; needle += (target - needle) * (Math.abs(target - needle) < 3 ? .1 : .22);
     const a = A(needle), col = shown.has ? (shown.ok ? '#34d399' : Math.abs(needle) < 15 ? '#fbbf24' : '#f87171') : 'rgba(255,255,255,.3)';
     c.save(); c.shadowColor = col; c.shadowBlur = shown.has ? 24 : 0; c.strokeStyle = col; c.lineWidth = 7; c.lineCap = 'round';
     c.beginPath(); c.moveTo(cx, cy); c.lineTo(cx + Math.cos(a) * (R - 18), cy + Math.sin(a) * (R - 18)); c.stroke(); c.restore();

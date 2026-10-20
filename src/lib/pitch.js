@@ -15,32 +15,63 @@
     const W = Math.floor(buf.length / 2);
     const maxTau = Math.min(W - 1, Math.floor(sr / minF));
     const minTau = Math.max(2, Math.floor(sr / maxF));
-    const d = new Float32Array(maxTau + 1);
-    for (let tau = 1; tau <= maxTau; tau++) {
-      let s = 0;
-      for (let j = 0; j < W; j++) { const x = buf[j] - buf[j + tau]; s += x * x; }
-      d[tau] = s;
-    }
-    // cumulative mean normalised difference
-    const cm = new Float32Array(maxTau + 1); cm[0] = 1;
-    let run = 0;
-    for (let tau = 1; tau <= maxTau; tau++) { run += d[tau]; cm[tau] = run ? (d[tau] * tau) / run : 1; }
-    let tau = -1;
-    for (let t = minTau; t < maxTau; t++) {
-      if (cm[t] < threshold) { while (t + 1 < maxTau && cm[t + 1] < cm[t]) t++; tau = t; break; }
+    const d = new Float32Array(maxTau + 2), cm = new Float32Array(maxTau + 2); cm[0] = 1;
+    // difference function + cumulative mean, computed lag by lag so the search can stop at the first clear dip
+    let run = 0, tau = -1, best = minTau;
+    for (let t = 1; t <= maxTau; t++) {
+      let acc = 0; for (let j = 0; j < W; j++) { const x = buf[j] - buf[j + t]; acc += x * x; }
+      d[t] = acc; run += acc; cm[t] = run ? (acc * t) / run : 1;
+      if (t >= minTau) {
+        if (cm[t] < cm[best]) best = t;
+        if (tau < 0 && cm[t] < threshold && t > minTau && cm[t] > cm[t - 1]) { tau = t - 1; break; } // first local minimum under the threshold
+      }
     }
     if (tau < 0) { // no dip under the threshold: report the best candidate with low confidence
-      let best = minTau; for (let t = minTau; t < maxTau; t++) if (cm[t] < cm[best]) best = t;
       return { freq: -1, prob: Math.max(0, 1 - cm[best]), rms: level };
     }
     // parabolic interpolation
     const a = cm[tau - 1], b = cm[tau], c = cm[tau + 1], den = a + c - 2 * b;
     const shift = den ? (a - c) / (2 * den) : 0;
-    return { freq: sr / (tau + shift), prob: 1 - cm[tau], rms: level };
+    return { freq: sr / (tau + shift), prob: 1 - cm[tau], rms: level, tau: tau + shift };
+  }
+
+  /** Halve the sample rate (2-tap average) so YIN costs a quarter as much. Fine for anything under ~8 kHz. */
+  function decimate(buf, k = 2) {
+    const n = Math.floor(buf.length / k), out = new Float32Array(n);
+    for (let i = 0; i < n; i++) { let s = 0; for (let j = 0; j < k; j++) s += buf[i * k + j]; out[i] = s / k; }
+    return out;
+  }
+  function ncorr(buf, lag) { const W = buf.length - lag; if (W < 64) return -1; let s = 0, e1 = 0, e2 = 0; for (let j = 0; j < W; j++) { const a = buf[j], b = buf[j + lag]; s += a * b; e1 += a * a; e2 += b * b; } return s / Math.sqrt(e1 * e2 + 1e-12); }
+  /**
+   * Octave check: YIN sometimes locks onto half the period of a low string (E2 read as E3). If the signal
+   * repeats at least as well at twice the period, the longer period is the real one.
+   */
+  function octaveCheck(buf, tau, maxTau) {
+    const t2 = Math.round(tau * 2); if (t2 > maxTau || t2 + 64 > buf.length) return tau;
+    const c1 = ncorr(buf, Math.round(tau)), c2 = Math.max(ncorr(buf, t2 - 1), ncorr(buf, t2), ncorr(buf, t2 + 1));
+    return c2 > c1 + .015 && c2 > .6 ? tau * 2 : tau;
+  }
+
+  /**
+   * Refine a period estimate by measuring it over several periods at once (normalised autocorrelation
+   * at k*tau with parabolic interpolation). Cents precision improves roughly k-fold, which is what makes
+   * the needle sit still instead of twitching.
+   */
+  function refine(buf, tau0) {
+    const N = buf.length; if (!(tau0 > 2)) return tau0;
+    const k = Math.max(1, Math.min(8, Math.floor((N / 2) / tau0)));
+    const lag0 = tau0 * k, W = Math.floor(N - lag0 - 3); if (k < 2 || W < tau0 * 2) return tau0;
+    const corr = lag => { let s = 0, e1 = 0, e2 = 0; for (let j = 0; j < W; j++) { const a = buf[j], b = buf[j + lag]; s += a * b; e1 += a * a; e2 += b * b; } return s / Math.sqrt(e1 * e2 + 1e-12); };
+    const vals = new Map(); let best = -Infinity, bl = Math.round(lag0);
+    for (let lag = Math.max(1, Math.floor(lag0 - 2)); lag <= Math.ceil(lag0 + 2); lag++) { const v = corr(lag); vals.set(lag, v); if (v > best) { best = v; bl = lag; } }
+    if (best < .5) return tau0;
+    const a = vals.has(bl - 1) ? vals.get(bl - 1) : corr(bl - 1), b = vals.get(bl), c = vals.has(bl + 1) ? vals.get(bl + 1) : corr(bl + 1), den = a + c - 2 * b, shift = den ? (a - c) / (2 * den) : 0;
+    const t = (bl + shift) / k;
+    return Math.abs(1200 * Math.log2(t / tau0)) < 60 ? t : tau0;
   }
 
   /** Median of recent readings, ignoring outliers (octave jumps). */
   function median(arr) { const s = [...arr].sort((x, y) => x - y); return s[Math.floor(s.length / 2)]; }
 
-  return { yin, rms, median };
+  return { yin, rms, median, refine, decimate, octaveCheck };
 });

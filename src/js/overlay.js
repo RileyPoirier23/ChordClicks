@@ -1,7 +1,9 @@
 /* Camera compositor: draws the camera frame + the chosen overlay layout onto the 1280x720 output canvas. */
 (function () {
   const RCC = (window.RCC = window.RCC || {});
-  const W = 1280, H = 720;
+  let W = 1280, H = 720;
+  /** Output size. Landscape 1280x720 for streaming/virtual cam, portrait 720x1280 for phone recordings. */
+  function setSize(w, h) { W = w; H = h; }
   const MODES = {
     full: { name: 'Full', valid: ['tc', 'mc', 'bc'], note: 'Big centred panel' },
     banner: { name: 'Banner', valid: ['tc', 'bc'], note: 'Slim bar along an edge' },
@@ -148,7 +150,7 @@
     else { const g = c.createLinearGradient(0, 0, W, H); g.addColorStop(0, '#12122a'); g.addColorStop(1, '#2a1030'); c.fillStyle = g; c.fillRect(0, 0, W, H); }
     c.restore();
     if (o.dim > 0) { c.fillStyle = `rgba(0,0,0,${o.dim / 100 * .8})`; c.fillRect(0, 0, W, H); }
-    const s = o.scale / 100, bg = `rgba(8,8,16,${o.bg / 100})`;
+    const s = o.scale / 100 * Math.min(1, W / 1280), bg = `rgba(8,8,16,${o.bg / 100})`;
     const soloOn = st.solo && st.solo.active && o.soloAuto && o.show.fret;
     if (o.mode !== 'off') {
       let pos = snap(o.mode, o.pos);
@@ -166,5 +168,5 @@
     if (o.show.brand) txt(c, 'CHORDCLICKS', W - 18, 24, '800 14px system-ui,sans-serif', st.accent, 'right');
   }
 
-  RCC.overlay = { render, MODES, DEFAULTS, snap, W, H };
+  RCC.overlay = { render, MODES, DEFAULTS, snap, setSize, get W() { return W; }, get H() { return H; } };
 })();

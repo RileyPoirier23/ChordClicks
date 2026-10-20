@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">ChordClicks</string>
+    <string name="title_activity_main">ChordClicks</string>
+    <string name="package_name">ca.clicks506.chordclicks</string>
+    <string name="custom_url_scheme">ca.clicks506.chordclicks</string>
+</resources>

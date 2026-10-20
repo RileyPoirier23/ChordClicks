@@ -22,6 +22,7 @@ contextBridge.exposeInMainWorld('rcc', {
     importFrom: () => inv('lib:import'),
   },
   version: () => inv('app:version'),
+  ug: { fetch: u => inv('ug:fetch', u) },
   saveRecording: (name, buf) => inv('rec:save', { name, data: buf }),
   savePdf: (name, html) => inv('pdf:save', { name, html }),
   setHotkeys: map => inv('hk:set', map),

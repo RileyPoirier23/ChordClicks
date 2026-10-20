@@ -35,7 +35,9 @@
   const UP = /^(u|up|↑|\^|v?↑)$/i, DOWN = /^(d|down|↓|↓)$/i;
   function mapStroke(x) {
     if (x == null || x === false) return '-';
-    if (typeof x === 'object') x = x.type ?? x.direction ?? x.value ?? x.stroke ?? x.d ?? x.name ?? '';
+    if (typeof x === 'object') x = x.type ?? x.direction ?? x.value ?? x.stroke ?? x.d ?? x.measure ?? x.name ?? '';
+    // Ultimate Guitar encodes strokes as numbers: 1 down, 2 up, 3 muted down, 4 muted up, 101/201… = rest
+    if (typeof x === 'number' || /^\d+$/.test(String(x).trim())) { const n = +x; return n === 1 || n === 3 ? 'D' : n === 2 || n === 4 ? 'U' : '-'; }
     x = String(x).trim();
     if (!x) return '-';
     if (DOWN.test(x)) return 'D'; if (UP.test(x)) return 'U';
@@ -78,15 +80,16 @@
       for (const it of flat(list)) {
         if (!it || typeof it !== 'object') continue;
         let arr = null;
-        for (const k of ['values', 'strumming', 'pattern', 'strums', 'beats', 'notes', 'data', 'rhythm']) {
+        for (const k of ['measures', 'values', 'strumming', 'pattern', 'strums', 'beats', 'notes', 'data', 'rhythm']) {
           if (it[k] != null) { arr = it[k]; break; }
         }
         let pat;
         if (typeof arr === 'string') pat = parseStrumString(arr);
         else if (Array.isArray(arr)) pat = flat(arr).map(mapStroke);
         else continue;
+        while (pat.length && pat[pat.length - 1] === '-' && pat.length > 32) pat.pop();
         if (!looksLikeStrum(pat)) continue;
-        const den = +it.denominator || +it.subdivision || 0;
+        const den = +it.denominator || +it.denuminator || +it.subdivision || 0;
         res.push({
           part: String(it.part || it.name || it.title || it.section || '').trim(),
           pat: strumToString(pat),
@@ -114,6 +117,19 @@
       }
     });
     return dedupeStrums(res);
+  }
+  /** Capo, tuning, tempo and key written in the text itself ("Capo: 2", "Tuning: Drop D", "Tempo: 120"). */
+  function findMetaInText(text) {
+    const meta = {}, head = clean(text).split('\n').slice(0, 40);
+    head.forEach(l => {
+      let m;
+      if (!meta.capo && (m = /\bcapo\b\s*[:=\-]?\s*(?:on\s+)?(?:fret\s+)?(\d{1,2})(?:st|nd|rd|th)?\b/i.exec(l))) meta.capo = m[1];
+      else if (!meta.capo && /\bno\s+capo\b/i.test(l)) meta.capo = '0';
+      if (!meta.tuning && (m = /\btuning\b\s*[:=\-]?\s*(.{2,40}?)\s*$/i.exec(l))) meta.tuning = m[1].replace(/[()[\]]/g, '').trim();
+      if (!meta.bpm && (m = /\b(?:tempo|bpm)\b\s*[:=\-]?\s*(\d{2,3})\b/i.exec(l))) meta.bpm = +m[1];
+      if (!meta.key && (m = /^\s*key\s*[:=\-]\s*([A-G][#b]?m?(?:in(?:or)?|aj(?:or)?)?)\b/i.exec(l))) meta.key = m[1].replace(/maj(or)?$/i, '').replace(/min(or)?$/i, 'm');
+    });
+    return meta;
   }
   function dedupeStrums(a) {
     const seen = new Set();
@@ -176,19 +192,28 @@
     six.forEach((raw, s) => {
       const m = /^\s*(?:[A-Ga-g][#b]?)?\s*[|:]?/.exec(raw), line = raw.slice(m[0].length);
       width = Math.max(width, line.length);
-      const re = /\d+/g; let x;
+      const re = /\d+/g; let x, last = null;
       while ((x = re.exec(line))) {
-        const prev = line[x.index - 1] || '', next = line[x.index + x[0].length] || '';
-        const tech = /[hp\/\\b]/.test(prev) ? prev : /[~^]/.test(next) ? '~' : '';
-        toks.push({ s, fret: +x[0], start: x.index, end: x.index + x[0].length, tech });
+        const prev = line[x.index - 1] || '', after = x.index + x[0].length, next = line[after] || '';
+        // "7b9" = bend fret 7 up to the pitch of fret 9; "7b9r7" = …and release. The target numbers are not new notes.
+        if ((prev === 'b' || prev === 'r') && last && last.end + 1 === x.index) {
+          if (prev === 'b') { last.bend = Math.max(1, +x[0] - last.fret); last.tech = 'b'; } else last.release = +x[0];
+          last.end = after; continue;
+        }
+        const tech = /[hp\/\\]/.test(prev) ? prev : next === 'b' ? 'b' : /[~^]/.test(next) ? '~' : '';
+        const tok = { s, fret: +x[0], start: x.index, end: after, tech };
+        if (next === 'b' && !/\d/.test(line[after + 1] || '')) tok.bend = 2;          // bare "7b": a full-step bend
+        if (last && /[hp\/\\]/.test(prev)) last.to = { fret: tok.fret, tech: prev };   // slide / hammer / pull target
+        toks.push(tok); last = tok;
       }
       if (s === 0) { [...line].forEach((ch, i) => { if (ch === '|' && i > 0) bars.add(i); }); }
     });
     toks.sort((a, b) => a.start - b.start || a.s - b.s);
     const events = []; let curE = null, maxEnd = -1;
+    const note = t => { const n = { s: t.s, fret: t.fret, tech: t.tech }; if (t.bend) n.bend = t.bend; if (t.release != null) n.release = t.release; if (t.to) n.to = t.to; return n; };
     toks.forEach(t => {
-      if (curE && t.start < maxEnd) { curE.notes.push({ s: t.s, fret: t.fret, tech: t.tech }); maxEnd = Math.max(maxEnd, t.end); }
-      else { curE = { t: t.start, notes: [{ s: t.s, fret: t.fret, tech: t.tech }] }; events.push(curE); maxEnd = t.end; }
+      if (curE && t.start < maxEnd) { curE.notes.push(note(t)); maxEnd = Math.max(maxEnd, t.end); }
+      else { curE = { t: t.start, notes: [note(t)] }; events.push(curE); maxEnd = t.end; }
     });
     const bl = [...bars].sort((a, b) => a - b); const gaps = [];
     for (let i = 1; i < bl.length; i++) gaps.push(bl[i] - bl[i - 1] - 0);
@@ -262,5 +287,5 @@
   }
   const chordNames = text => parseSheet(text).prog.map(p => p.c);
 
-  return { transposeText, looksLikeChordPro, fromChordPro, stageLines, stageIndex, chordNames, parseSheet, parseStrumString, strumToString, extractStrumsFromJSON, findStrumsInText, strumForSection, parseTabs, isTabLine, isSoloName, clean, SECTION_RE };
+  return { transposeText, looksLikeChordPro, fromChordPro, stageLines, stageIndex, chordNames, parseSheet, parseStrumString, strumToString, extractStrumsFromJSON, findStrumsInText, findMetaInText, strumForSection, parseTabs, isTabLine, isSoloName, clean, SECTION_RE };
 });

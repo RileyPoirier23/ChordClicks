@@ -105,13 +105,14 @@
   function paintLooper() {
     const l = A.looper, st = { idle: 'Ready', rec: 'Recording…', play: 'Playing', over: 'Overdubbing…', stopped: 'Stopped' }[l.state];
     $('lp-state').textContent = st; $('lp-state').className = 'lp-state ' + l.state;
-    $('lp-rec').textContent = l.state === 'rec' ? '■ Finish loop' : '● Record'; $('lp-over').disabled = !l.layers.length || l.state === 'rec' || l.state === 'stopped';
+    $('lp-rec').textContent = l.state === 'rec' ? '■ Finish loop' : '● Record'; $('lp-over').disabled = !l.layers.length || l.state === 'rec' || l.state === 'over';
     $('lp-layers').innerHTML = l.layers.map((ly, i) => `<div class="layer"><b>Layer ${i + 1}</b><input type="range" min="0" max="1.5" step=".05" value="${ly.vol}" data-i="${i}"><button class="btn sm ${ly.mute ? 'danger' : ''}" data-m="${i}">${ly.mute ? 'Muted' : 'Mute'}</button></div>`).join('') || '<div class="small">No layers yet. Hit Record, play a phrase, then overdub on top.</div>';
     $('lp-layers').querySelectorAll('input').forEach(r => r.oninput = () => l.setVol(+r.dataset.i, +r.value));
     $('lp-layers').querySelectorAll('[data-m]').forEach(b => b.onclick = () => l.setMute(+b.dataset.m, !l.layers[+b.dataset.m].mute));
   }
   async function loopRecord() {
     const l = A.looper; if (l.state === 'rec') { l.finish(); return; }
+    if (RCC.pro && !RCC.pro.gate('looper')) return;
     if (!A.fx || !A.fx.running) await power();
     const bars = +$('lp-bars').value, bpm = D.bpm ? D.bpm() : 100, beats = D.beats ? D.beats() : 4;
     l.comp = +$('lp-comp').value; await l.record({ bars, bpm, beats, countIn: $('lp-count').checked ? beats : 0 });
@@ -128,7 +129,7 @@
     R.start({ canvas: document.getElementById('out'), video: $('rc-vid').checked }); $('rc-btn').textContent = '■ Stop'; $('rc-btn').classList.add('rec');
   }
   function addTake(t) {
-    if (!t) return; const ext = t.video ? 'webm' : 'webm', name = 'RCC-take-' + new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19) + '.' + ext;
+    if (!t) return; const ext = t.ext || 'webm', name = 'RCC-take-' + new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19) + '.' + ext;
     t.file = name; const el = document.createElement('div'); el.className = 'take';
     el.innerHTML = `<${t.video ? 'video' : 'audio'} src="${t.url}" controls ${t.video ? 'muted' : ''}></${t.video ? 'video' : 'audio'}><div><b>${t.name}</b><div class="small">${Math.round(t.dur)}s · ${(t.size / 1048576).toFixed(1)} MB · ${t.video ? 'camera + overlay + audio' : 'audio only'}</div><div class="row"><button class="btn sm p save">Save…</button></div></div>`;
     el.querySelector('.save').onclick = async () => {

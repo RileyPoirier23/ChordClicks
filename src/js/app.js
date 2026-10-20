@@ -4,11 +4,12 @@
   const $ = id => document.getElementById(id), root = document.documentElement;
   const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
   const DEFAULT_PAT = 'D-DU-UDU';
-  const ACCENTS = ['#8b5cf6', '#ec4899', '#38bdf8', '#34d399', '#fbbf24', '#fb923c', '#f87171'];
+  const ACCENTS = ['#c8102e', '#e0a100', '#2f80ed', '#1f9d55', '#ff6b35', '#f3f0e8', '#8b5cf6'];
 
   /* ================================================================ settings */
-  const P = Object.assign({ accent: '#8b5cf6', fs: 17, asr: 0, mir: false, bpm: 90, beats: 4, sub: 2, vol: .7, autoc: true, follow: true, autopat: true, motion: true, impGenre: '' },
+  const P = Object.assign({ accent: '#c8102e', fs: 17, asr: 0, mir: false, bpm: 90, beats: 4, sub: 2, vol: .7, autoc: true, follow: true, autopat: true, motion: false, impGenre: '' },
     (() => { try { return JSON.parse(localStorage.getItem('rcc2') || '{}'); } catch (e) { return {}; } })());
+  if (P.accent === '#8b5cf6' && !P.look2) { P.accent = '#c8102e'; P.motion = false; } P.look2 = true;   // one-time move to the 3.2 look
   P.ov = Object.assign({}, OV.DEFAULTS, P.ov || {}); P.ov.show = Object.assign({}, OV.DEFAULTS.show, (P.ov || {}).show || {});
   const saveP = () => { try { localStorage.setItem('rcc2', JSON.stringify(P)); } catch (e) {} };
 
@@ -16,7 +17,7 @@
 
   /* ================================================================ dialogs + menus */
   let onCancel = null;
-  function dialog(html, mount, cancel) { $('dlg').innerHTML = html; $('modal').classList.add('on'); onCancel = cancel || null; mount && mount(); }
+  function dialog(html, mount, cancel) { $('dlg').className = 'dlg'; $('dlg').innerHTML = html; $('modal').classList.add('on'); onCancel = cancel || null; mount && mount(); }
   function closeDlg() { $('modal').classList.remove('on'); onCancel = null; }
   $('modal').addEventListener('mousedown', e => { if (e.target === $('modal')) { const c = onCancel; closeDlg(); c && c(); } });
   function askText(title, val = '', ok = 'Save') {
@@ -81,7 +82,7 @@
     }).join('\n');
   }
   function renderSongHeader() {
-    const s = song || {}, bits = [s.artist, s.genre, s.meta && s.meta.key && 'Key ' + s.meta.key, s.meta && s.meta.capo && 'Capo ' + s.meta.capo].filter(Boolean);
+    const s = song || {}, m = s.meta || {}, bits = [s.artist, s.genre, m.key && 'Key ' + m.key, m.capo && 'Capo ' + m.capo, m.tuning && !/standard/i.test(m.tuning) && m.tuning, s.bpm && s.bpm + ' bpm'].filter(Boolean);
     $('np-t').textContent = s.title || 'No song loaded'; $('np-s').textContent = bits.join(' · ') || 'Search Ultimate Guitar or open your library';
     $('sh-title').textContent = s.title ? s.title : 'Chord sheet';
     const qi = queue.ids.length ? queue.ids.indexOf(s.id) : -1;
@@ -214,14 +215,14 @@
   /* ---- trainer / timing / backing controls ---- */
   $('loopsel').onchange = e => { TR.loop = e.target.value; $('looprange').style.display = TR.loop === 'custom' ? '' : 'none'; paintLoop(); };
   $('loopfrom').onchange = $('loopto').onchange = paintLoop;
-  $('ramp').onchange = e => { TR.ramp = e.target.checked; $('rampset').style.display = TR.ramp ? '' : 'none'; if (!running) TR.speed = TR.ramp ? TR.rampStart : 100; if (TR.ramp && TR.loop === 'off') toast('Tip: pick a section to loop, then the tempo climbs each clean pass'); paintSpeed(); saveTR(); };
+  $('ramp').onchange = e => { if (e.target.checked && !RCC.pro.gate('trainer')) { e.target.checked = false; return; } TR.ramp = e.target.checked; $('rampset').style.display = TR.ramp ? '' : 'none'; if (!running) TR.speed = TR.ramp ? TR.rampStart : 100; if (TR.ramp && TR.loop === 'off') toast('Tip: pick a section to loop, then the tempo climbs each clean pass'); paintSpeed(); saveTR(); };
   $('rampstart').oninput = e => { TR.rampStart = +e.target.value; $('rampstart-v').textContent = TR.rampStart + '%'; if (!running) TR.speed = TR.rampStart; paintSpeed(); saveTR(); };
   async function setListen(on) {
     if (on) { try { unListen = await RCC.audio.listen.use({ chroma: ev => { if (!running || !prog[pi] || !ev.loud) return; fbCur.heard = true; const m = RCC.chroma.matchChord(ev.chroma, prog[pi].c); if (m.ok) fbCur.hit = true; const el = $('fb'); el.style.display = ''; el.className = 'tag ' + (m.ok ? 'ok' : 'miss'); el.textContent = m.ok ? '✓ ' + prog[pi].c + ' sounds right' : (m.heard ? 'Heard ' + m.heard : 'Listening…'); } }); TR.listen = true; }
       catch (e) { toast('Microphone unavailable: ' + (e.message || e)); TR.listen = false; $('listen').checked = false; } }
     else { unListen && unListen(); unListen = null; TR.listen = false; $('fb').style.display = 'none'; $('fbtxt').textContent = ''; }
   }
-  $('listen').onchange = e => setListen(e.target.checked);
+  $('listen').onchange = e => { if (e.target.checked && !RCC.pro.gate('trainer')) { e.target.checked = false; return; } setListen(e.target.checked); };
   $('accpat').onchange = e => { TR.acc = e.target.value; saveTR(); }; $('flash').onchange = e => { TR.flash = e.target.checked; saveTR(); };
   $('silent').onchange = e => { TR.silent = e.target.checked; saveTR(); }; $('sil-play').onchange = e => { TR.silPlay = Math.max(1, +e.target.value || 3); saveTR(); }; $('sil-mute').onchange = e => { TR.silMute = Math.max(1, +e.target.value || 1); saveTR(); };
   $('bstyle').innerHTML = Object.entries(RCC.backing.STYLES).map(([k, v]) => `<option value="${k}">${v}</option>`).join('');
@@ -239,18 +240,18 @@
   }
 
   /* ================================================================ navigation */
-  const views = ['practice', 'library', 'find', 'solo', 'scales', 'learn', 'tuner', 'gear', 'stream', 'settings'];
+  const views = ['practice', 'library', 'find', 'solo', 'scales', 'learn', 'tuner', 'gear', 'stream', 'record', 'support', 'settings'];
   function show(v) {
     if (v !== 'tuner') RCC.tuner.stop();
     document.querySelectorAll('.nav').forEach(b => b.classList.toggle('on', b.dataset.view === v));
     views.forEach(n => $('v-' + n).classList.toggle('on', n === v));
     if (v === 'library') renderLib(); if (v === 'scales') RCC.scales.redraw(); if (v === 'stream') renderStreamUI(); if (v === 'practice') showChord();
-    if (v === 'find') fillImportTargets(); if (v === 'learn') RCC.learn.redraw();
+    if (v === 'find') { fillImportTargets(); paintOnline(); setTimeout(() => $('ug-q').focus(), 50); } if (RCC.record) RCC.record.onView(v === 'record'); if (v === 'learn') RCC.learn.redraw();
   }
   document.querySelectorAll('.nav').forEach(b => b.onclick = () => show(b.dataset.view));
 
   /* ================================================================ library UI */
-  let selKey = 'all'; const metaCache = new Map();
+  let selKey = 'all', selMode = false; const selIds = new Set(), metaCache = new Map();
   function songMeta(s) {
     const k = s.id + ':' + (s.text || '').length + ':' + (s.soloTab || '').length; let m = metaCache.get(k);
     if (!m) { m = { chords: SG.parseSheet(s.text || '').prog.length, tabs: SG.parseTabs((s.text || '') + '\n' + (s.soloTab || '')).sections.length }; metaCache.set(k, m); } return m;
@@ -275,15 +276,64 @@
     $('lib-ren').style.display = $('lib-del').style.display = $('lib-notes').style.display = $('lib-pdf').style.display = $('lib-print').style.display = isPl ? '' : 'none'; $('lib-play').disabled = $('lib-shuf').disabled = !list.length;
     $('songs').innerHTML = list.map((s, i) => {
       const m = songMeta(s), gc = s.genre ? Store.genreColor(s.genre) : 'var(--ac)';
-      return `<div class="song ${song && song.id === s.id ? 'cur' : ''}" data-id="${s.id}" style="--gc:${gc};animation-delay:${Math.min(i, 12) * 25}ms"><div class="acts">${isPl && sort === 'recent' && !q && flt === 'all' ? `<button data-act="up" title="Move earlier">▲</button><button data-act="dn" title="Move later">▼</button>` : ''}<button data-act="more" title="More">⋯</button></div><b>${esc(s.title)}</b><div class="ar">${esc(s.artist) || '&nbsp;'}</div><div class="meta">${s.genre ? `<span class="tag" style="color:${gc}">${esc(s.genre)}</span>` : ''}<span class="tag">${m.chords} chords</span>${RCC.lib2.badge(RCC.lib2.info(s))}${(s.strums || []).length ? '<span class="tag ok">strum ✓</span>' : ''}${m.tabs ? '<span class="tag ok">solo tab ✓</span>' : ''}</div></div>`;
+      return `<div class="song ${song && song.id === s.id ? 'cur' : ''} ${selMode && selIds.has(s.id) ? 'picked' : ''}" data-id="${s.id}" style="--gc:${gc};animation-delay:${Math.min(i, 12) * 25}ms">${selMode ? `<span class="pick">${selIds.has(s.id) ? '✓' : ''}</span>` : ''}<div class="acts">${isPl && sort === 'recent' && !q && flt === 'all' ? `<button data-act="up" title="Move earlier">▲</button><button data-act="dn" title="Move later">▼</button>` : ''}<button data-act="more" title="More">⋯</button></div><b>${esc(s.title)}</b><div class="ar">${esc(s.artist) || '&nbsp;'}</div><div class="meta">${s.genre ? `<span class="tag" style="color:${gc}">${esc(s.genre)}</span>` : ''}<span class="tag">${m.chords} chords</span>${RCC.lib2.badge(RCC.lib2.info(s))}${(s.strums || []).length ? '<span class="tag ok">strum ✓</span>' : ''}${m.tabs ? '<span class="tag ok">solo tab ✓</span>' : ''}</div></div>`;
     }).join('') || `<div class="empty"><b>${q ? 'No matches' : 'Nothing here yet'}</b>${q ? 'Try a different filter.' : 'Import a song from Ultimate Guitar in <u>Find</u>, or paste one on the Practice page.'}</div>`;
     document.querySelectorAll('#songs .song').forEach(e => {
-      e.onclick = ev => { const id = e.dataset.id; if (ev.target.dataset.act === 'up' || ev.target.dataset.act === 'dn') { const i = pl.songIds.indexOf(id); Store.reorderPlaylist(pl.id, i, i + (ev.target.dataset.act === 'up' ? -1 : 1)); return; } if (ev.target.dataset.act === 'more') { const r = ev.target.getBoundingClientRect(); songMenu(id, r.left, r.bottom + 4); return; } playList(list.map(x => x.id), id, $('lib-title').textContent); };
+      e.onclick = ev => { const id = e.dataset.id; if (selMode) { if (selIds.has(id)) selIds.delete(id); else selIds.add(id); paintBulk(list); e.classList.toggle('picked', selIds.has(id)); e.querySelector('.pick').textContent = selIds.has(id) ? '✓' : ''; return; } if (ev.target.dataset.act === 'up' || ev.target.dataset.act === 'dn') { const i = pl.songIds.indexOf(id); Store.reorderPlaylist(pl.id, i, i + (ev.target.dataset.act === 'up' ? -1 : 1)); return; } if (ev.target.dataset.act === 'more') { const r = ev.target.getBoundingClientRect(); songMenu(id, r.left, r.bottom + 4); return; } playList(list.map(x => x.id), id, $('lib-title').textContent); };
       e.oncontextmenu = ev => { ev.preventDefault(); songMenu(e.dataset.id, ev.clientX, ev.clientY); };
     });
     $('lib-play').onclick = () => playList(list.map(x => x.id), list[0] && list[0].id, $('lib-title').textContent);
     $('lib-shuf').onclick = () => { const ids = list.map(x => x.id).sort(() => Math.random() - .5); playList(ids, ids[0], $('lib-title').textContent + ' (shuffled)'); };
-    sugg(); fillImportTargets(); renderAcct();
+    paintBulk(list); sugg(); fillImportTargets(); renderAcct();
+  }
+  /* ---- multi-select: add to playlist / tag genre / delete several songs at once ---- */
+  function paintBulk(list) {
+    $('bulk').hidden = !selMode; $('lib-sel').textContent = selMode ? 'Done' : 'Select'; $('lib-sel').classList.toggle('on', selMode); if (!selMode) return;
+    $('bulk-n').textContent = selIds.size + ' selected';
+    $('bulk-pl').innerHTML = '<option value="">Add to playlist…</option>' + Store.lib.playlists.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('') + '<option value="__new">+ New playlist…</option>';
+    $('bulk-g').innerHTML = '<option value="">Set genre…</option>' + [...new Set([...Store.PRESET_GENRES, ...Store.genres().map(g => g.name)])].map(g => `<option>${esc(g)}</option>`).join('') + '<option value="__clear">(no genre)</option>';
+    $('bulk-all').onclick = () => { if (selIds.size === list.length) selIds.clear(); else list.forEach(s => selIds.add(s.id)); renderLib(); };
+  }
+  $('lib-sel').onclick = () => { selMode = !selMode; selIds.clear(); renderLib(); };
+  $('bulk-x').onclick = () => { selMode = false; selIds.clear(); renderLib(); };
+  $('bulk-pl').onchange = async e => {
+    let pid = e.target.value; e.target.value = ''; if (!pid || !selIds.size) return;
+    if (pid === '__new') { const n = await askText('New playlist', ''); if (!n) return; pid = Store.createPlaylist(n).id; }
+    const p = Store.playlist(pid); let n = 0; selIds.forEach(id => { if (!p.songIds.includes(id)) { Store.toggleInPlaylist(pid, id); n++; } }); toast(`Added ${n} song${n === 1 ? '' : 's'} to ${p.name}`);
+  };
+  $('bulk-g').onchange = e => { const g = e.target.value; e.target.value = ''; if (!g || !selIds.size) return; selIds.forEach(id => Store.updateSong(id, { genre: g === '__clear' ? '' : g })); toast('Genre updated'); };
+  $('bulk-del').onclick = async () => { if (!selIds.size) return; if (await askConfirm(`Delete ${selIds.size} song${selIds.size === 1 ? '' : 's'}?`)) { selIds.forEach(id => { Store.removeSong(id); if (song && song.id === id) song = null; }); selIds.clear(); toast('Deleted'); } };
+  /* ---- Pro card, helper server, first run ---- */
+  function paintPro() {
+    const st = RCC.pro.status(), box = $('pro-body'); if (!box) return;
+    box.innerHTML = `<div class="row" style="margin:0 0 8px"><span class="pro-tag big">${st.kind === 'free' ? 'FREE' : 'PRO'}</span><b>${esc(st.label)}</b></div>
+      ${st.kind === 'pro' ? `<div class="small">Thanks for supporting ChordClicks. Your key works offline on any of your devices.</div><div class="row"><button class="btn sm" id="pro-off">Remove key from this device</button></div>`
+      : `<ul class="pro-list compact">${RCC.pro.FEATURES.map(f => `<li><b>${esc(f[1])}</b></li>`).join('')}</ul><div class="row">${RCC.pro.trialUsed() ? '' : `<button class="btn p" id="pro-try">Start ${RCC.pro.TRIAL_DAYS}-day trial</button>`}${RCC.pro.live() ? `<a class="btn ${RCC.pro.trialUsed() ? 'p' : ''}" href="${esc(RCC.pro.BUY_URL)}" target="_blank" rel="noreferrer">Buy Pro · ${esc(RCC.pro.PRICE)}</a>` : '<span class="small">Keys go on sale soon at 506clicks.ca</span>'}<button class="btn" id="pro-enter">Enter key</button></div>`}`;
+    const t = $('pro-try'); if (t) t.onclick = () => { RCC.pro.startTrial(); toast('Pro trial started'); };
+    const k = $('pro-enter'); if (k) k.onclick = () => RCC.pro.keyDialog();
+    const o = $('pro-off'); if (o) o.onclick = async () => { if (await askConfirm('Remove the Pro key from this device?', 'Remove')) RCC.pro.deactivate(); };
+    // PRO tags on gated controls
+    const mark = (sel, f) => document.querySelectorAll(sel).forEach(el => RCC.pro.mark(el, f));
+    mark('#solo-mode [data-v=score], #solo-mode [data-v=wait]', 'score'); mark('#lp-rec', 'looper'); mark('#vcam', 'stream'); mark('#lib-pdf, #lib-notes', 'library');
+    document.querySelectorAll('#ramp, #listen').forEach(i => RCC.pro.mark(i.closest('label'), 'trainer'));
+    document.querySelectorAll('#ln-tabs [data-t=changes]').forEach(el => RCC.pro.mark(el, 'trainer'));
+    document.querySelectorAll('#sc-tabs button:not([data-t=scales])').forEach(el => RCC.pro.mark(el, 'neck'));
+  }
+  function paintProxy() {
+    let v = ''; try { v = localStorage.getItem('rcc-proxy') || ''; } catch (e) {} $('px-url').value = v;
+    $('px-url').onchange = e => { const u = e.target.value.trim().replace(/\/+$/, ''); try { localStorage.setItem('rcc-proxy', u); } catch (err) {} $('px-msg').textContent = u ? 'Saved. Ultimate Guitar search will go through it.' : 'Cleared.'; };
+    $('px-test').onclick = async () => { const u = $('px-url').value.trim().replace(/\/+$/, ''); if (!/^https:\/\//.test(u)) { $('px-msg').textContent = 'Address must start with https://'; return; } $('px-msg').textContent = 'Testing…'; try { const r = await fetch(u + '/api/health', { signal: AbortSignal.timeout(8000) }).then(x => x.json()); $('px-msg').textContent = r && r.ok ? '✓ Helper server is answering.' : 'That address answered, but not like a ChordClicks helper.'; } catch (e) { $('px-msg').textContent = 'No answer from that address.'; } };
+  }
+  function welcome() {
+    const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone, native = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()), phone = matchMedia('(pointer:coarse)').matches;
+    dialog(`<svg class="logo" viewBox="0 0 64 64"><use href="#logo"/></svg><h2>Welcome to ChordClicks</h2><p class="small" style="line-height:1.5;margin:4px 0 12px">Your chords on your camera, a tuner, play-along scoring, scales, lessons and a pedalboard — all in one practice room. Here’s a good first five minutes:</p>
+      <div class="wl-grid"><button class="wl" data-go="find"><b>1 · Find a song</b><span>Search Ultimate Guitar or paste any chord sheet.</span></button><button class="wl" data-go="tuner"><b>2 · Tune up</b><span>Plug in or use the mic. Pluck one string at a time.</span></button><button class="wl" data-go="solo"><b>3 · Try the demo solo</b><span>Watch notes scroll, then let it score you.</span></button><button class="wl" data-go="learn"><b>4 · Learn something</b><span>Chords, fingerpicking, theory, ear training.</span></button></div>
+      ${!R && phone && !standalone && !native ? '<div class="hint" style="margin-top:10px"><b>Tip:</b> add ChordClicks to your home screen (Share → Add to Home Screen) for full screen and offline use.</div>' : ''}
+      <div class="row" style="justify-content:space-between;margin-top:14px"><span class="small">${RCC.pro.trialUsed() ? '' : `Everything is unlocked for ${RCC.pro.TRIAL_DAYS} days when you start the Pro trial — no card.`}</span><button class="btn p" id="wl-x">Let’s go</button></div>`, () => {
+      $('dlg').classList.add('wide'); P.welcomed = true; saveP();
+      $('dlg').querySelectorAll('.wl').forEach(b => b.onclick = () => { closeDlg(); show(b.dataset.go); if (b.dataset.go === 'solo') $('solo-demo').click(); });
+      $('wl-x').onclick = closeDlg;
+    });
   }
   function songMenu(id, x, y) {
     const s = Store.song(id); if (!s) return;
@@ -314,48 +364,100 @@
   function sugg() { const q = $('q').value.toLowerCase(); $('sugg').innerHTML = Store.lib.songs.filter(x => (x.title + ' ' + x.artist).toLowerCase().includes(q)).slice(0, 12).map(x => `<option value="${esc(x.title + ' — ' + x.artist)}">`).join(''); }
   Store.on(() => { if ($('v-library').classList.contains('on')) renderLib(); else { sugg(); fillImportTargets(); } renderAcct(); renderNewChords(); });
 
-  /* ================================================================ Ultimate Guitar */
-  const EXTRACT = `(()=>{try{const j=JSON.parse(document.querySelector('.js-store').dataset.content),d=j.store.page.data;const found=[];(function w(o,dp){if(!o||typeof o!=='object'||dp>12)return;for(const k of Object.keys(o)){if(/strum/i.test(k)&&o[k]&&typeof o[k]==='object')found.push(o[k]);w(o[k],dp+1)}})(j,0);
-   const tv=d.tab_view||{},m=tv.meta||{};return JSON.stringify({title:d.tab.song_name,artist:d.tab.artist_name,text:tv.wiki_tab.content,strum:found.slice(0,12),meta:{key:d.tab.tonality_name||'',capo:m.capo||tv.capo||''},url:location.href})}catch(e){const t=document.querySelector('pre');return t?JSON.stringify({title:document.title.split(' by ')[0]||'Untitled',artist:(document.title.split(' by ')[1]||'').split(' @')[0],text:t.innerText,strum:[],meta:{},url:location.href}):null}})()`;
+  /* ================================================================ Ultimate Guitar (own UI, nothing from the site is displayed) */
+  const UG = { q: '', type: 'chords', page: 1, results: [], more: false, sel: -1, cur: null, busy: false, sort: 'best' };
+  const ugOrder = list => { const k = UG.sort, sc = r => r.rating * Math.log10((r.votes || 0) + 10); return list.slice().sort((a, b) => k === 'rating' ? b.rating - a.rating || b.votes - a.votes : k === 'votes' ? b.votes - a.votes : k === 'version' ? b.version - a.version : sc(b) - sc(a)); };
   function fillImportTargets() {
     $('genres').innerHTML = [...new Set([...Store.PRESET_GENRES, ...Store.genres().map(g => g.name)])].map(g => `<option value="${esc(g)}">`).join('');
     const cur = $('imp-pl').value; $('imp-pl').innerHTML = '<option value="">No playlist</option>' + Store.lib.playlists.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join(''); $('imp-pl').value = cur; $('imp-genre').value = $('imp-genre').value || P.impGenre || '';
   }
+  const ugErr = e => (e && e.message === 'offline') ? 'You’re offline — only saved songs are available' : 'Ultimate Guitar: ' + ((e && e.message) || 'something went wrong');
+  const stars = r => { const n = Math.max(0, Math.min(5, Math.round(r))); return '★'.repeat(n) + `<span style="opacity:.3">${'★'.repeat(5 - n)}</span>`; };
+  function ugRender() {
+    const box = $('ug-results');
+    if (UG.busy === 'search' && !UG.results.length) { box.innerHTML = `<div class="empty"><b>Searching…</b>${esc(UG.q)}</div>`; return; }
+    if (!UG.results.length) { box.innerHTML = `<div class="empty"><b>${UG.q ? 'No results' : 'Search Ultimate Guitar'}</b>${UG.q ? 'Try fewer words, or switch between Chords, Tabs and All.' : 'Type a song or artist above. Versions open here — no website, no ads.'}</div>`; return; }
+    const shown = ugOrder(UG.results).map(r => UG.results.indexOf(r));
+    box.innerHTML = shown.map(i => { const r = UG.results[i]; return `<div class="ugr ${i === UG.sel ? 'on' : ''}" data-i="${i}"><div class="grow" style="min-width:0"><b>${esc(r.title)}</b><div class="ar">${esc(r.artist)}${r.version > 1 ? ' · ver ' + r.version : ''}${r.key ? ' · ' + esc(r.key) : ''}</div></div><div class="rt"><span class="tag">${esc(r.type)}</span><div>${stars(r.rating)} <span>${r.votes ? r.votes.toLocaleString() : ''}</span></div></div></div>`; }).join('')
+      + (UG.more ? `<div class="row" style="justify-content:center;margin:10px 0 4px"><button class="btn sm" id="ug-more" ${UG.busy ? 'disabled' : ''}>${UG.busy ? 'Loading…' : 'More results'}</button></div>` : '');
+    box.querySelectorAll('.ugr').forEach(e => e.onclick = () => ugOpen(+e.dataset.i));
+    const m = $('ug-more'); if (m) m.onclick = () => ugSearch(UG.q, UG.page + 1);
+  }
+  async function ugSearch(q, pg = 1) {
+    q = String(q || '').trim(); if (!q) return;
+    if (!RCC.ug.online()) { toast('You’re offline — only saved songs are available'); return; }
+    UG.q = q; $('ug-q').value = q; UG.busy = 'search'; if (pg === 1) { UG.results = []; UG.sel = -1; UG.cur = null; $('ug-prev').innerHTML = '<div class="empty"><b>Nothing selected</b>Pick a result to preview it before you import.</div>'; } ugRender();
+    try { const r = await RCC.ug.search(q, { type: UG.type, page: pg }); if (UG.q !== q) return; UG.page = pg; UG.results = pg === 1 ? r.results : UG.results.concat(r.results); UG.more = r.more; }
+    catch (e) { toast(ugErr(e)); }
+    UG.busy = false; ugRender();
+    if (pg === 1 && UG.results.length && UG.sel < 0) ugOpen(0);
+  }
+  async function ugOpen(i) {
+    const r = UG.results[i]; if (!r) return; UG.sel = i; UG.cur = null; ugRender();
+    const box = $('ug-prev'); box.innerHTML = `<div class="empty"><b>Loading…</b>${esc(r.title)} — ${esc(r.artist)}</div>`;
+    try { const t = await RCC.ug.tab(r.url); if (UG.sel !== i) return; UG.cur = t; ugPreview(t); }
+    catch (e) { if (UG.sel !== i) return; box.innerHTML = `<div class="empty"><b>Couldn’t load that one</b>${esc(ugErr(e))}<div class="row" style="justify-content:center;margin-top:10px"><button class="btn sm" id="ug-ext">Open in your browser</button></div></div>`; $('ug-ext').onclick = () => window.open(r.url, '_blank'); }
+  }
+  function ugPreview(t) {
+    const box = $('ug-prev'), m = t.meta || {}, bits = [m.key && 'Key ' + m.key, m.capo && 'Capo ' + m.capo, m.tuning && 'Tuning ' + m.tuning, t.bpm && t.bpm + ' bpm', m.difficulty && String(m.difficulty)].filter(Boolean);
+    box.innerHTML = `<div class="ph"><div class="grow" style="min-width:0"><h2 class="ell">${esc(t.title)}</h2><div class="small ell">${esc(t.artist)}${bits.length ? ' · ' + bits.map(esc).join(' · ') : ''}</div></div><button class="btn p" id="ug-imp">Import this song</button><button class="btn sm" id="ug-ext" title="Open on ultimate-guitar.com in your browser">↗</button></div>
+      <div class="ug-meta">${t.chords.length ? `<span class="small">Chords</span>${t.chords.slice(0, 16).map(c => `<span class="tag">${esc(c)}</span>`).join('')}` : '<span class="small">No chord line found — it may be a tab-only page.</span>'}${t.strums.length ? `<span class="small" style="margin-left:6px">Strum</span>${t.strums.slice(0, 3).map(s => `<span class="tag ok" title="${esc(s.part || '')}">${esc((s.part ? s.part + ' ' : '') + s.pat)}</span>`).join('')}` : ''}</div>
+      <pre id="ug-text"></pre>`;
+    $('ug-text').innerHTML = renderSheetHTML(SG.parseSheet(t.text));
+    $('ug-imp').onclick = () => ugImport(t); $('ug-ext').onclick = () => window.open(t.url, '_blank');
+  }
+  function ugImport(x) {
+    if (!RCC.pro.canAddSong(Store.lib.songs.length) && !Store.lib.songs.some(s => s.title.toLowerCase() === String(x.title).toLowerCase())) { RCC.pro.upsell('library'); return; }
+    const genre = $('imp-genre').value.trim(); P.impGenre = genre; saveP();
+    const saved = Store.addSong({ title: x.title, artist: x.artist, text: x.text, strums: x.strums || [], pat: '', bpm: x.bpm || 0, genre, meta: x.meta || {}, url: x.url });
+    const pid = $('imp-pl').value; if (pid && Store.playlist(pid) && !Store.playlist(pid).songIds.includes(saved.id)) Store.toggleInPlaylist(pid, saved.id);
+    const nTabs = SG.parseTabs(x.text).sections.length, ns = (x.strums || []).length, m = x.meta || {};
+    toast(`Imported “${x.title}”${ns ? ' · ' + ns + ' strumming pattern' + (ns > 1 ? 's' : '') : ''}${m.capo ? ' · capo ' + m.capo : ''}${m.tuning ? ' · ' + m.tuning : ''}${nTabs ? ' · ' + nTabs + ' tab section' + (nTabs > 1 ? 's' : '') : ''}`);
+    playList([saved.id], saved.id, pid ? Store.playlist(pid).name : '');
+  }
+  $('ug-go').onclick = () => ugSearch($('ug-q').value); $('ug-q').onkeydown = e => { if (e.key === 'Enter') ugSearch($('ug-q').value); };
+  $('ug-sort').onchange = e => { UG.sort = e.target.value; ugRender(); };
+  document.querySelectorAll('#ug-type button').forEach(b => b.onclick = () => { UG.type = b.dataset.v; document.querySelectorAll('#ug-type button').forEach(x => x.classList.toggle('on', x === b)); if (UG.q) ugSearch(UG.q); });
+  $('find-off-lib').onclick = () => show('library');
   $('ug').onclick = () => {
     const v = $('q').value.trim(), hit = Store.lib.songs.find(x => (x.title + ' — ' + x.artist) === v);
     if (hit) { playList([hit.id], hit.id, ''); return; } if (!v) return;
-    show('find'); $('ugv').src = 'https://www.ultimate-guitar.com/search.php?search_type=title&value=' + encodeURIComponent(v);
+    if (!RCC.ug.online()) { selKey = 'all'; $('lib-q').value = v; show('library'); toast('You’re offline — showing saved songs that match'); return; }
+    show('find'); ugSearch(v);
   };
   $('q').onkeydown = e => { if (e.key === 'Enter') $('ug').click(); }; $('q').oninput = sugg;
-  $('ugh').onclick = () => { $('ugv').src = 'https://www.ultimate-guitar.com/'; };
-  $('ugback').onclick = () => { try { $('ugv').canGoBack() && $('ugv').goBack(); } catch (e) {} };
-  $('imp').onclick = async () => {
-    try {
-      const r = await $('ugv').executeJavaScript(EXTRACT); if (!r) throw 0; const x = JSON.parse(r);
-      let found = SG.extractStrumsFromJSON({ strum: x.strum || [] }); if (!found.length) found = SG.findStrumsInText(x.text);
-      const genre = $('imp-genre').value.trim(); P.impGenre = genre; saveP();
-      const saved = Store.addSong({ title: x.title, artist: x.artist, text: x.text, strums: found, pat: '', bpm: (found.find(f => f.bpm) || {}).bpm || 0, genre, meta: x.meta || {}, url: x.url });
-      const pid = $('imp-pl').value; if (pid && !Store.playlist(pid).songIds.includes(saved.id)) Store.toggleInPlaylist(pid, saved.id);
-      const nTabs = SG.parseTabs(x.text).sections.length;
-      toast(`Imported “${x.title}” · ${found.length ? found.length + ' strumming pattern' + (found.length > 1 ? 's' : '') : 'no strumming pattern found – set one on the Practice page'}${nTabs ? ' · ' + nTabs + ' tab section' + (nTabs > 1 ? 's' : '') : ''}`);
-      playList([saved.id], saved.id, pid ? Store.playlist(pid).name : '');
-    } catch (e) {
-      try { // not a UG page: take selected text, or the biggest <pre> / text block, from whatever site is open
-        const r = await $('ugv').executeJavaScript(`(()=>{try{let t=String(getSelection()||'').trim();if(t.length<30){const c=[...document.querySelectorAll('pre,textarea,.chords,.tab-content,[class*=lyrics],[class*=chord]')].map(e=>e.innerText||e.value||'').sort((a,b)=>b.length-a.length);t=(c[0]||'').trim()}return t.length>30?JSON.stringify({text:t,title:document.title.split(/[|\\-–—]/)[0].trim()}):null}catch(e){return null}})()`);
-        if (!r) throw 0; const x = JSON.parse(r); RCC.lib2.openImport({ title: x.title, text: x.text });
-      } catch (e2) { toast('Select the chord text on the page (or open a chords page), then Import'); }
-    }
-  };
+  /* ---- offline awareness: everything saved keeps working, only Ultimate Guitar needs a connection ---- */
+  function paintOnline() {
+    const on = RCC.ug.online(); document.body.classList.toggle('offline', !on); $('find-off').hidden = on; $('netpill').hidden = on;
+    $('q').placeholder = on ? 'Search Ultimate Guitar or your library' : 'Offline — search your saved songs';
+  }
+  window.addEventListener('online', () => { paintOnline(); toast('Back online'); }); window.addEventListener('offline', () => { paintOnline(); toast('You’re offline — your saved songs still work'); });
 
   /* ================================================================ camera + overlay + output */
   const cv = $('out'), cx = cv.getContext('2d', { willReadFrequently: true });
-  let stream = null, camId = ''; try { camId = localStorage.getItem('rcc-cam') || ''; } catch (e) {}
+  let stream = null, camId = '', facing = ''; try { camId = localStorage.getItem('rcc-cam') || ''; } catch (e) {}
+  /** 1280x720 (landscape) or 720x1280 (portrait). The virtual camera needs landscape, so it keeps that. */
+  function setOutputSize(w, h) {
+    if (cv.width === w && cv.height === h) return; if (vOn && (w !== 1280 || h !== 720)) { toast('Stop the virtual camera to record portrait'); return; }
+    [cv, $('pv'), $('pv2'), $('pvc'), $('pvr')].forEach(c => { if (c) { c.width = w; c.height = h; } }); OV.setSize(w, h);
+  }
   async function listCams() { try { const d = (await navigator.mediaDevices.enumerateDevices()).filter(x => x.kind === 'videoinput'); $('camsel').innerHTML = d.map((x, i) => `<option value="${x.deviceId}">${esc(x.label || 'Camera ' + (i + 1))}</option>`).join('') || '<option>No camera found</option>'; if (d.some(x => x.deviceId === camId)) $('camsel').value = camId; } catch (e) {} }
   async function startCam() {
-    try { if (stream) stream.getTracks().forEach(t => t.stop()); const v = { width: { ideal: 1280 }, height: { ideal: 720 } }; if (camId) v.deviceId = { exact: camId };
+    const v = { width: { ideal: 1280 }, height: { ideal: 720 } }; if (facing) v.facingMode = { ideal: facing }; else if (camId) v.deviceId = { exact: camId };
+    const In = RCC.audio.input;
+    if (In.combined) { // iPhone / iPad: camera and mic share one capture (see audio.js)
+      In.onVideo = st => { $('cam').srcObject = st; if (st) { $('cam').play().catch(() => {}); const t = st.getVideoTracks()[0]; camId = (t && t.getSettings().deviceId) || camId; listCams(); } };
+      try { await In.setVideo(v); if (In._videoFailed) { const e = In._videoFailed; In._videoFailed = null; throw e; } } catch (e) { if (camId || facing) { camId = ''; facing = ''; return startCam(); } toast('Camera unavailable (' + (e.name || e.message || e) + ')'); }
+      return;
+    }
+    try { if (stream) stream.getTracks().forEach(t => t.stop());
       stream = await navigator.mediaDevices.getUserMedia({ video: v }); $('cam').srcObject = stream; camId = stream.getVideoTracks()[0].getSettings().deviceId || camId; await listCams();
-    } catch (e) { if (camId) { camId = ''; return startCam(); } toast('Camera unavailable (' + e.name + ')'); }
+    } catch (e) { if (camId || facing) { camId = ''; facing = ''; return startCam(); } toast('Camera unavailable (' + e.name + ')'); }
   }
+  /** Is the camera actually delivering frames right now? */
+  const camLive = () => { const c = $('cam'), t = c.srcObject && c.srcObject.getVideoTracks()[0]; return !!(t && t.readyState === 'live' && !t.muted && c.videoWidth > 0); };
+  /** Phones: flip between the selfie and the back camera. */
+  function flipCam() { facing = facing === 'environment' ? 'user' : 'environment'; camId = ''; return startCam(); }
   $('camsel').onchange = e => { camId = e.target.value; try { localStorage.setItem('rcc-cam', camId); } catch (_) {} startCam(); };
   navigator.mediaDevices && navigator.mediaDevices.addEventListener('devicechange', listCams);
 
@@ -367,7 +469,7 @@
     OV.render(cx, { opts: P.ov, video: $('cam'), mirror: P.mir, accent: P.accent, chord: prog[pi] ? prog[pi].c : '—', prog, pi, pat, stepNow, bpm: Math.round(curBpm()), running, solo: so, flash: flashV, flashAcc,
       stage: { lines: stageLines, cur: sti, sec: stageLines[sti] && stageLines[sti].sec }, queue: RCC.chat ? RCC.chat.queue : [] });
     const targets = [];
-    if ($('v-practice').classList.contains('on')) targets.push($('pv')); if ($('v-stream').classList.contains('on')) targets.push($('pv2')); if (document.body.classList.contains('clean')) targets.push($('pvc'));
+    if ($('v-practice').classList.contains('on')) targets.push($('pv')); if ($('v-stream').classList.contains('on')) targets.push($('pv2')); if ($('v-record').classList.contains('on')) targets.push($('pvr')); if (document.body.classList.contains('clean')) targets.push($('pvc'));
     targets.forEach(t => t.getContext('2d').drawImage(cv, 0, 0, t.width, t.height));
     // solo fretboard fades into the practice page when a solo section arrives
     const ps = RCC.solo.panelState(), sp = $('solopanel'), vis = !!(ps && ps.alpha > .02 && $('v-practice').classList.contains('on'));
@@ -380,8 +482,8 @@
   /* virtual camera (RGBA frames, same size as the canvas) */
   let vOn = false, vt = null;
   if (R) {
-    R.onStatus(m => { vOn = m.on; $('vmsg').textContent = m.text; $('vstat').textContent = m.on ? 'Virtual cam live' : 'Virtual cam off'; $('vstat').classList.toggle('on', m.on); $('vcam').textContent = m.on ? 'Stop virtual camera' : 'Start virtual camera'; clearInterval(vt); if (m.on) vt = setInterval(() => { try { R.frame(cx.getImageData(0, 0, 1280, 720).data.buffer); } catch (e) {} }, 33); });
-    $('vcam').onclick = () => vOn ? R.stop() : R.start();
+    R.onStatus(m => { vOn = m.on; $('vmsg').textContent = m.text; $('vstat').textContent = m.on ? 'Virtual cam live' : 'Virtual cam off'; $('vstat').classList.toggle('on', m.on); $('vcam').textContent = m.on ? 'Stop virtual camera' : 'Start virtual camera'; clearInterval(vt); if (m.on) vt = setInterval(() => { try { if (cv.width === 1280) R.frame(cx.getImageData(0, 0, 1280, 720).data.buffer); } catch (e) {} }, 33); });
+    $('vcam').onclick = () => { if (vOn) R.stop(); else RCC.pro.gate('stream', () => R.start()); };
     $('vsetup').onclick = async () => { const r = await R.setupVcam(); toast(r.ok ? 'Setup started – approve the Windows prompt, then restart your video app.' : (r.error || 'Setup failed')); };
   } else { $('vcam').disabled = $('vsetup').disabled = true; $('vmsg').textContent = 'Virtual camera needs the desktop app.'; }
 
@@ -419,9 +521,9 @@
   function applyLook() {
     root.style.setProperty('--ac', P.accent); root.style.setProperty('--fs', P.fs + 'px'); $('acc').value = P.accent;
     document.querySelectorAll('.swatch').forEach(s => s.classList.toggle('on', s.dataset.c === P.accent));
-    $('ambient').style.display = P.motion ? '' : 'none';
+    document.body.classList.toggle('grain', !!P.motion);
     const hex = P.accent, r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
-    root.style.setProperty('--ac2', `hsl(${(Math.round(Math.atan2(Math.sqrt(3) * (g - b), 2 * r - g - b) * 180 / Math.PI) + 360 + 50) % 360} 85% 62%)`);
+    root.style.setProperty('--ac2', `rgb(${Math.round(r * .72)} ${Math.round(g * .72)} ${Math.round(b * .72)})`);   // darker shade of the accent for hover / pressed
   }
   $('swatches').innerHTML = ACCENTS.map(c => `<span class="swatch" data-c="${c}" style="background:${c}"></span>`).join('');
   document.querySelectorAll('.swatch').forEach(s => s.onclick = () => { P.accent = s.dataset.c; saveP(); applyLook(); showChord(); });
@@ -430,7 +532,9 @@
   $('autopat').onchange = e => { P.autopat = e.target.checked; saveP(); }; $('motion').onchange = e => { P.motion = e.target.checked; saveP(); applyLook(); };
   setInterval(() => { if (P.asr && !P.follow) $('sheet').scrollTop += P.asr * .15; }, 30);
   $('exp').onclick = async () => { const r = await Store.exportLib(); if (r && r.ok) toast('Songs exported'); };
-  $('imp-lib').onclick = async () => { if (!R) return toast('Import needs the desktop app'); const r = await R.lib.importFrom(); if (r.ok) { const n = Store.mergeLib(r.lib); toast('Imported ' + n + ' new song' + (n === 1 ? '' : 's')); } else if (r.error) toast(r.error); };
+  $('imp-lib').onclick = async () => {
+    if (!R) { const f = document.createElement('input'); f.type = 'file'; f.accept = '.json,application/json'; f.onchange = async () => { try { const n = Store.mergeLib(JSON.parse(await f.files[0].text())); toast('Imported ' + n + ' new song' + (n === 1 ? '' : 's')); } catch (e) { toast('That file is not a valid song export.'); } }; f.click(); return; }
+    const r = await R.lib.importFrom(); if (r.ok) { const n = Store.mergeLib(r.lib); toast('Imported ' + n + ' new song' + (n === 1 ? '' : 's')); } else if (r.error) toast(r.error); };
 
   /* ================================================================ accounts */
   function renderAcct() {
@@ -487,12 +591,18 @@
     $('ramp').checked = TR.ramp; $('rampset').style.display = TR.ramp ? '' : 'none'; $('rampstart').value = TR.rampStart; $('rampstart-v').textContent = TR.rampStart + '%'; if (TR.ramp) TR.speed = TR.rampStart; $('accpat').value = TR.acc; $('flash').checked = TR.flash; $('silent').checked = TR.silent; $('sil-play').value = TR.silPlay; $('sil-mute').value = TR.silMute; $('backing').checked = TR.backing; $('bstyle').value = TR.bstyle; $('bvol').value = TR.bvol; $('bcomp').checked = TR.bcomp; paintSpeed();
     RCC.solo.init({ track: o => Store.track(o), songTitle: () => (song && song.title) || '', result: r => Store.track({ drill: 'solo-' + r.mode, score: { key: r.key, v: Math.round(r.acc) } }), audio, bpm: { get: () => P.bpm, set: setBpm }, toast, accent: () => P.accent, click: acc => clickAt(audio().currentTime + .01, acc, false), saveTab: t => { if (song) { song.soloTab = t; if (song.id) Store.updateSong(song.id, { soloTab: t }); RCC.solo.setSong(song); toast('Tab saved to this song'); } } });
     RCC.tuner.init({ audio, toast });
-    RCC.learn.init({ toast, audio, accent: () => P.accent, jam: (text, title) => { loadSong(tempSong(title, text, { artist: 'Theory lesson' })); show('practice'); }, useChord: n => { loadSong(tempSong(n, '[Chord]\n' + n, { artist: 'Chord library' })); show('practice'); }, track: o => Store.track(o), bpm: () => P.bpm });
+    RCC.learn.init({ toast, audio, accent: () => P.accent, jam: (text, title) => { loadSong(tempSong(title, text, { artist: 'Theory lesson' })); show('practice'); }, useChord: n => { loadSong(tempSong(n, '[Chord]\n' + n, { artist: 'Chord library' })); show('practice'); }, track: o => Store.track(o), bpm: () => P.bpm, drill: (text, name) => { if (RCC.solo.openTab(text, name)) show('solo'); } });
     RCC.gear.init({ toast, bpm: () => P.bpm, beats: () => +$('beats').value });
+    if (RCC.record) RCC.record.init({ toast, setOutputSize, flipCam, camLive, startCam, setMode, modes: OV.MODES, P, saveP, running: () => running, toggle, songTitle: () => (song && song.title) || '', out: cv, renderStreamUI });
     RCC.scales.init({ audio, toast, track: o => Store.track(o), drill: (text, name) => { if (RCC.solo.openTab(text, name)) show('solo'); }, accent: () => P.accent, jam: (text, title) => { loadSong(tempSong(title, text, { artist: 'Scale Lab' })); show('practice'); } });
-    await Store.init(); RCC.controls.init();
+    await Store.init(); await RCC.pro.init(); RCC.controls.init();
     renderAcct(); renderLib(); renderStreamUI();
-    if (R) R.version().then(v => { $('ver').textContent = 'v' + v; });
+    if (R) R.version().then(v => { $('ver').textContent = $('ver2').textContent = 'v' + v; });
+    paintOnline(); paintPro(); paintProxy(); RCC.pro.onChange(() => { paintPro(); renderLib(); });
+    $('sup-pro').onclick = () => (RCC.pro.has() ? show('settings') : RCC.pro.upsell());
+    if (!P.welcomed) setTimeout(welcome, 600); else setTimeout(() => RCC.pro.splash(), 900);
+    $('sup-share').onclick = async () => { const url = 'https://www.506clicks.ca/projects/chordclicks/', text = 'ChordClicks — free guitar practice app with your chords on camera'; try { if (navigator.share) await navigator.share({ title: 'ChordClicks', text, url }); else { await navigator.clipboard.writeText(url); toast('Link copied — thanks for sharing!'); } } catch (e) {} };
+    if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => {});
     loadSong(tempSong('Sample', '[Verse]\nAm        F\nPaste a song from Ultimate Guitar here\nC         G\nand the chords show up on your camera'));
     song.title = ''; renderSongHeader();
     startCam();
@@ -501,6 +611,6 @@
     $('paste').value = text; if (song && metaPatch) { song.meta = Object.assign({}, song.meta || {}, metaPatch); if (song.id) Store.updateSong(song.id, { meta: song.meta }); }
     applyText(); renderSongHeader();
   }
-  RCC.app = { get song() { return song; }, get prog() { return prog; }, get pi() { return pi; }, get sheet() { return sheet; }, get running() { return running; }, loadSong, show, toast, dialog, closeDlg, askText, askConfirm, menu, esc, P, saveP, Store, setBpm, nav, setPi, toggle, playList, renderLib, tempSong, replaceText, applyText, setMode, renderStreamUI, TR };
-  window.__rcc = { EXTRACT, loadSong, show, get song() { return song; }, tempSong, P };
+  RCC.app = { setOutputSize, flipCam, get song() { return song; }, get prog() { return prog; }, get pi() { return pi; }, get sheet() { return sheet; }, get running() { return running; }, loadSong, show, toast, dialog, closeDlg, askText, askConfirm, menu, esc, P, saveP, Store, setBpm, nav, setPi, toggle, playList, renderLib, tempSong, replaceText, applyText, setMode, renderStreamUI, TR };
+  window.__rcc = { loadSong, show, get song() { return song; }, tempSong, P, ugSearch, UG };
 })();
