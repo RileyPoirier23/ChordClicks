@@ -317,6 +317,7 @@
     mark('#solo-mode [data-v=score], #solo-mode [data-v=wait]', 'score'); mark('#lp-rec', 'looper'); mark('#vcam', 'stream'); mark('#lib-pdf, #lib-notes', 'library');
     document.querySelectorAll('#ramp, #listen').forEach(i => RCC.pro.mark(i.closest('label'), 'trainer'));
     document.querySelectorAll('#ln-tabs [data-t=changes]').forEach(el => RCC.pro.mark(el, 'trainer'));
+    document.querySelectorAll('#sc-tabs button:not([data-t=scales])').forEach(el => RCC.pro.mark(el, 'neck'));
   }
   function paintProxy() {
     let v = ''; try { v = localStorage.getItem('rcc-proxy') || ''; } catch (e) {} $('px-url').value = v;

@@ -9,6 +9,7 @@
     ['trainer', 'Smart trainers', 'Tempo ramps, chord checking while you practice, the chord-change trainer and full ear training.'],
     ['looper', 'Looper', 'Sample-accurate loops and overdubs recorded after your pedals and amp.'],
     ['stream', 'Streaming kit', 'Virtual camera for Zoom / OBS / Discord, scenes with hotkeys, Twitch song requests.'],
+    ['neck', 'Arpeggios, triads & CAGED', 'The whole neck beyond scales: arpeggio shapes, triad sets and inversions, the five CAGED positions.'],
     ['library', 'Unlimited library', `Save more than ${FREE_SONGS} songs, with set lists, gig notes and PDF export.`],
     ['finger', 'All fingerpicking patterns', 'Every pattern in the Fingerpicking room, not just the first three.'],
     ['sync', 'Cloud sync', 'Keep songs, playlists and progress in step across computers and phones.'],

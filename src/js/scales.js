@@ -58,7 +58,7 @@
     wheel();
     document.querySelectorAll('#sc-show button').forEach(b => b.onclick = () => { st.show = b.dataset.v; refresh(); });
     $('sc-hide').onchange = e => { st.hide = e.target.checked; draw(); };
-    document.querySelectorAll('#sc-tabs button').forEach(b => b.onclick = () => { st.tab = b.dataset.t; st.pos = -1; stopPlay(); st.quiz = null; renderQuiz(); refresh(); });
+    document.querySelectorAll('#sc-tabs button').forEach(b => { if (b.dataset.t !== 'scales' && RCC.pro) RCC.pro.mark(b, 'neck'); b.onclick = () => { if (b.dataset.t !== 'scales' && RCC.pro && !RCC.pro.gate('neck')) return; st.tab = b.dataset.t; st.pos = -1; stopPlay(); st.quiz = null; renderQuiz(); refresh(); }; });
     $('sc-learned').onclick = () => { const k = lkey(st.root, curType()), was = learned(st.root, curType()); S_().setScaleLearned(k, !was); refresh(); if (!was) D.toast(nm(st.root) + ' ' + T.SCALES[curType()].name + ' marked as learned 🎸'); };
     $('sc-play').onclick = playScale; $('sc-prog').innerHTML = Object.keys(PROGS).map(k => `<option>${k}</option>`).join('');
     $('sc-jam').onclick = jam; $('sc-quiz').onclick = startQuiz; $('sc-drill').onclick = drill;
