@@ -35,10 +35,12 @@ node scripts/licence.mjs verify CCPRO-…
 ```
 
 ## Ultimate Guitar on web and phones (helper server)
-Browsers block cross-site reads, so the web and phone builds relay Ultimate Guitar through a tiny server you run for free:
-either `deploy/ug-proxy.worker.js` on Cloudflare Workers (`wrangler deploy deploy/ug-proxy.worker.js --name chordclicks-ug`)
-or this repo on Render (`render.yaml`, which also hosts cloud sync). Paste the address into Settings → Helper server.
-The Windows app needs none of this.
+Browsers block cross-site reads, so the web and phone builds relay Ultimate Guitar through a helper server. Out of the box
+that is **506clicks.ca** (`/api/ug` in the 506CLICKS repo), so users never set anything up. The owner can point every app
+at a different helper from the 506clicks.ca panel (Edit the site → ChordClicks helper server); the apps read it on their
+next start. To host your own instead: `deploy/ug-proxy.worker.js` on Cloudflare Workers
+(`wrangler deploy deploy/ug-proxy.worker.js --name chordclicks-ug`) or this repo on Render (`render.yaml`, which also
+hosts cloud sync), then paste its address under Settings → Advanced. The Windows app needs none of this.
 
 ## Phone / tablet
 The same app runs as a native Android / iOS app through Capacitor, and as an installable web app (PWA). Saved songs,

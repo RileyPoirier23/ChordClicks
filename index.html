@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob: mediastream:; connect-src 'self' wss://irc-ws.chat.twitch.tv https://www.ultimate-guitar.com https://tabs.ultimate-guitar.com https://www.506clicks.ca; frame-src https:; worker-src 'self' blob:; script-src 'self' blob:">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob: mediastream:; connect-src 'self' https: wss://irc-ws.chat.twitch.tv; frame-src https:; worker-src 'self' blob:; script-src 'self' blob:">
 <title>ChordClicks</title>
 <link rel="stylesheet" href="src/styles.css">
 <link rel="manifest" href="manifest.webmanifest">
@@ -377,9 +377,9 @@
       <div class="row"><button class="btn" id="acct-btn">Sign in</button><button class="btn" id="exp">Export songs</button><button class="btn" id="imp-lib">Import songs</button></div></div>
      <div class="card"><h4>Hotkeys &amp; foot pedal</h4><div class="small" style="margin-bottom:8px">Click a box, then press the key. <b>Global</b> keys work even when the app isn’t focused (desktop app). <b>MIDI</b>: click Learn, then press your pedal.</div><div id="hk-table"></div><div class="row"><button class="btn sm" id="hk-reset">Reset to defaults</button><span class="small" id="hk-midi">MIDI: not checked</span></div></div>
      <div class="card pro-card" id="pro-card"><h4>ChordClicks Pro</h4><div id="pro-body"></div></div>
-     <div class="card"><h4>Helper server <span class="small" style="text-transform:none;letter-spacing:0">(web &amp; phone)</span></h4>
-      <div class="small">The web and phone builds can’t read Ultimate Guitar directly, so they go through a tiny relay you run for free: deploy <code>deploy/ug-proxy.worker.js</code> to Cloudflare or the repo to Render (<code>render.yaml</code>), then paste its address here. The desktop app doesn’t need it.</div>
-      <div class="row"><input id="px-url" class="grow" placeholder="https://chordclicks-ug.you.workers.dev"><button class="btn sm" id="px-test">Test</button></div><div class="small" id="px-msg"></div></div>
+     <details class="card" id="px-card"><summary class="small" style="cursor:pointer">Advanced</summary>
+      <div class="small" style="margin-top:8px">On the web and on phones, Ultimate Guitar search goes through 506clicks.ca automatically. Only fill this in if you host your own relay (<code>deploy/ug-proxy.worker.js</code> or <code>render.yaml</code> in the repo). Leave it blank for normal use.</div>
+      <div class="row"><input id="px-url" class="grow" placeholder="Custom helper server (optional)"><button class="btn sm" id="px-test">Test</button></div><div class="small" id="px-msg"></div></details>
      <div class="card"><h4>Cloud sync <span class="small" style="text-transform:none;letter-spacing:0">(optional)</span></h4><div id="sync-body"></div></div>
      <div class="card"><h4>About</h4><div class="small"><b>ChordClicks</b> <span id="ver"></span><br>Created by Riley Mackay-Poirier <a href="https://www.506clicks.ca" target="_blank" rel="noreferrer" style="color:inherit;font-weight:700">@506clicks</a><br>Keys: ← → chords · Space start/stop · Esc leaves Clean mode</div></div>
     </div>

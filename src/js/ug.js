@@ -17,17 +17,14 @@
   }
   const online = () => navigator.onLine !== false;
 
-  const proxyUrl = () => { try { return String(localStorage.getItem('rcc-proxy') || '').replace(/\/+$/, ''); } catch (e) { return ''; } };
+  /** Web / phone: relay through the helper (506clicks.ca by default; see RCC.pro.helperUrl). Same JSON contract as
+      server/server.js and deploy/ug-proxy.worker.js. */
+  const proxyUrl = () => (RCC.pro && RCC.pro.helperUrl ? RCC.pro.helperUrl() : 'https://www.506clicks.ca');
   async function fetchHtml(url) {
     if (R && R.ug) { const r = await R.ug.fetch(url); if (!r || !r.ok) throw new Error(r && r.error || 'Could not reach Ultimate Guitar'); return r.html; }
-    const px = proxyUrl();
-    if (px) { // web / phone: relay through the ChordClicks helper server (server/server.js or deploy/ug-proxy.worker.js)
-      const r = await fetch(px + '/api/ug?url=' + encodeURIComponent(url), { signal: AbortSignal.timeout(25000) }).then(x => x.json()).catch(() => null);
-      if (!r || !r.ok) throw new Error((r && r.error) || 'the helper server didn’t answer (Settings → Helper server)'); return r.html;
-    }
-    const native = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
-    try { const r = await fetch(url, { credentials: 'omit', headers: { accept: 'text/html' } }); if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); }
-    catch (e) { if (native) throw e; throw new Error('this build needs a helper server for Ultimate Guitar (Settings → Helper server), or use “Paste instead…”'); }
+    const r = await fetch(proxyUrl() + '/api/ug?url=' + encodeURIComponent(url), { signal: AbortSignal.timeout(25000) }).then(x => x.json()).catch(() => null);
+    if (!r || !r.ok) throw new Error((r && r.error) || (online() ? 'Ultimate Guitar didn’t answer. Try again in a moment, or use “Paste instead…”' : 'You’re offline. Reconnect, or use “Paste instead…”'));
+    return r.html;
   }
   /** Fallback: let the hidden webview render the page (handles bot checks) and read the same store. */
   function viaWebview(url) {

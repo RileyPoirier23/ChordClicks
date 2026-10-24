@@ -7,12 +7,12 @@
   /* Checkout details come from the website (Settings the owner publishes from the panel): whether buying is open yet,
      the checkout link (Square) and the price. Cached so the app behaves the same offline. */
   const lsGetRaw = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } };
-  const cfg = Object.assign({ proLive: false, buy: SITE + '/projects/chordclicks/#pro', price: '$24.99' }, lsGetRaw('rcc-procfg', {}));
+  const cfg = Object.assign({ proLive: false, buy: SITE + '/projects/chordclicks/#pro', price: '$24.99', helper: '' }, lsGetRaw('rcc-procfg', {}));
   const live = () => !!cfg.proLive && !!cfg.buy;
   async function syncConfig() {
     if (navigator.onLine === false) return;
     try { const j = await fetch(SITE + '/api/content', { cache: 'no-store', signal: AbortSignal.timeout(6000) }).then(r => r.json()); const c = (j && j.chordclicks) || {};
-      Object.assign(cfg, { proLive: !!c.proLive, buy: c.buy || cfg.buy, price: c.price || cfg.price, promo: c.promo || '' }); try { localStorage.setItem('rcc-procfg', JSON.stringify(cfg)); } catch (e) {} emit(); } catch (e) {}
+      Object.assign(cfg, { proLive: !!c.proLive, buy: c.buy || cfg.buy, price: c.price || cfg.price, promo: c.promo || '', helper: String(c.helper || '').trim().replace(/\/+$/, '') }); try { localStorage.setItem('rcc-procfg', JSON.stringify(cfg)); } catch (e) {} emit(); } catch (e) {}
   }
   const FEATURES = [
     ['score', 'Play-along scoring', 'Score me and Wait-for-me in Solo: the app listens and grades every note.'],
@@ -102,5 +102,8 @@
   function mark(el, feature) { if (!el) return; let t = el.querySelector(':scope > .pro-tag'); if (has()) { t && t.remove(); return; } if (!t) { t = document.createElement('span'); t.className = 'pro-tag'; t.textContent = 'PRO'; t.title = (FEATURE_OF[feature] || [])[1] || 'ChordClicks Pro'; el.appendChild(t); } }
   const canAddSong = count => has() || count < FREE_SONGS;
 
-  RCC.pro = { init, has, status, gate, upsell, keyDialog, activate, deactivate, startTrial, trialLeft, trialUsed, mark, canAddSong, splash, live, config: () => cfg, FEATURES, FREE_SONGS, TRIAL_DAYS, get PRICE() { return cfg.price; }, get BUY_URL() { return cfg.buy; }, onChange: f => st._l.push(f) };
+  /* Where the web and phone builds relay Ultimate Guitar: a manual override from Settings → Advanced, else whatever the
+     owner set in the 506clicks.ca panel, else 506clicks.ca itself (its /api/ug). Users never have to set anything up. */
+  const helperUrl = () => { let o = ''; try { o = String(localStorage.getItem('rcc-proxy') || ''); } catch (e) {} return (o.trim() || cfg.helper || SITE).replace(/\/+$/, ''); };
+  RCC.pro = { init, has, status, gate, upsell, keyDialog, activate, deactivate, startTrial, trialLeft, trialUsed, mark, canAddSong, splash, live, config: () => cfg, helperUrl, SITE, FEATURES, FREE_SONGS, TRIAL_DAYS, get PRICE() { return cfg.price; }, get BUY_URL() { return cfg.buy; }, onChange: f => st._l.push(f) };
 })();

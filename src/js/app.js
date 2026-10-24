@@ -321,8 +321,9 @@
   }
   function paintProxy() {
     let v = ''; try { v = localStorage.getItem('rcc-proxy') || ''; } catch (e) {} $('px-url').value = v;
-    $('px-url').onchange = e => { const u = e.target.value.trim().replace(/\/+$/, ''); try { localStorage.setItem('rcc-proxy', u); } catch (err) {} $('px-msg').textContent = u ? 'Saved. Ultimate Guitar search will go through it.' : 'Cleared.'; };
-    $('px-test').onclick = async () => { const u = $('px-url').value.trim().replace(/\/+$/, ''); if (!/^https:\/\//.test(u)) { $('px-msg').textContent = 'Address must start with https://'; return; } $('px-msg').textContent = 'Testing…'; try { const r = await fetch(u + '/api/health', { signal: AbortSignal.timeout(8000) }).then(x => x.json()); $('px-msg').textContent = r && r.ok ? '✓ Helper server is answering.' : 'That address answered, but not like a ChordClicks helper.'; } catch (e) { $('px-msg').textContent = 'No answer from that address.'; } };
+    if (window.rcc && window.rcc.ug) $('px-card').style.display = 'none'; // desktop reads Ultimate Guitar itself
+    $('px-url').onchange = e => { const u = e.target.value.trim().replace(/\/+$/, ''); if (u && !/^https:\/\//.test(u)) { $('px-msg').textContent = 'Address must start with https://'; return; } try { if (u) localStorage.setItem('rcc-proxy', u); else localStorage.removeItem('rcc-proxy'); } catch (err) {} $('px-msg').textContent = u ? 'Saved. Ultimate Guitar search will go through it.' : 'Cleared. Back to 506clicks.ca.'; };
+    $('px-test').onclick = async () => { const u = RCC.pro.helperUrl(); $('px-msg').textContent = 'Testing ' + u + '…'; try { const r = await fetch(u + '/api/health', { signal: AbortSignal.timeout(8000) }).then(x => x.json()); $('px-msg').textContent = r && r.ok ? '✓ ' + u + ' is answering.' : 'That address answered, but not like a ChordClicks helper.'; } catch (e) { $('px-msg').textContent = 'No answer from ' + u + '.'; } };
   }
   function welcome() {
     const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone, native = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()), phone = matchMedia('(pointer:coarse)').matches;
