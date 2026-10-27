@@ -1,7 +1,8 @@
 // Builds the static web/mobile bundle into www/ (what Capacitor wraps and what a static host serves).
 import { cpSync, mkdirSync, rmSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-const root = resolve(new URL('..', import.meta.url).pathname), out = resolve(root, 'www');
+import { fileURLToPath } from 'node:url';
+const root = fileURLToPath(new URL('..', import.meta.url)), out = resolve(root, 'www');
 rmSync(out, { recursive: true, force: true }); mkdirSync(out, { recursive: true });
 for (const f of ['index.html', 'manifest.webmanifest', 'sw.js']) cpSync(resolve(root, f), resolve(out, f));
 cpSync(resolve(root, 'src'), resolve(out, 'src'), { recursive: true });

@@ -2,7 +2,8 @@
 // `node scripts/changelog.mjs notes [version]` prints one version's section as release notes (used by the desktop workflow).
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-const root = resolve(new URL('..', import.meta.url).pathname);
+import { fileURLToPath } from 'node:url';
+const root = fileURLToPath(new URL('..', import.meta.url));
 export function parse(md) {
   const out = []; let cur = null;
   for (const line of md.split('\n')) {
