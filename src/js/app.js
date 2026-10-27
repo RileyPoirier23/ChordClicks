@@ -320,7 +320,8 @@
     document.querySelectorAll('#sc-tabs button:not([data-t=scales])').forEach(el => RCC.pro.mark(el, 'neck'));
   }
   function paintProxy() {
-    let v = ''; try { v = localStorage.getItem('rcc-proxy') || ''; } catch (e) {} $('px-url').value = v;
+    let v = ''; try { v = localStorage.getItem('rcc-proxy') || ''; } catch (e) {} $('px-url').value = v; const auto = RCC.pro.config().helper;
+    $('px-url').placeholder = auto || 'https://chordclicks-ug.you.workers.dev'; if (!v && auto) $('px-msg').textContent = 'Using the helper published by 506clicks.ca. Type an address to override it.';
     $('px-url').onchange = e => { const u = e.target.value.trim().replace(/\/+$/, ''); try { localStorage.setItem('rcc-proxy', u); } catch (err) {} $('px-msg').textContent = u ? 'Saved. Ultimate Guitar search will go through it.' : 'Cleared.'; };
     $('px-test').onclick = async () => { const u = $('px-url').value.trim().replace(/\/+$/, ''); if (!/^https:\/\//.test(u)) { $('px-msg').textContent = 'Address must start with https://'; return; } $('px-msg').textContent = 'Testing…'; try { const r = await fetch(u + '/api/health', { signal: AbortSignal.timeout(8000) }).then(x => x.json()); $('px-msg').textContent = r && r.ok ? '✓ Helper server is answering.' : 'That address answered, but not like a ChordClicks helper.'; } catch (e) { $('px-msg').textContent = 'No answer from that address.'; } };
   }
@@ -598,7 +599,7 @@
     await Store.init(); await RCC.pro.init(); RCC.controls.init();
     renderAcct(); renderLib(); renderStreamUI();
     if (R) R.version().then(v => { $('ver').textContent = $('ver2').textContent = 'v' + v; });
-    paintOnline(); paintPro(); paintProxy(); RCC.pro.onChange(() => { paintPro(); renderLib(); });
+    paintOnline(); paintPro(); paintProxy(); RCC.pro.onChange(() => { paintPro(); paintProxy(); renderLib(); });
     $('sup-pro').onclick = () => (RCC.pro.has() ? show('settings') : RCC.pro.upsell());
     if (!P.welcomed) setTimeout(welcome, 600); else setTimeout(() => RCC.pro.splash(), 900);
     $('sup-share').onclick = async () => { const url = 'https://www.506clicks.ca/projects/chordclicks/', text = 'ChordClicks — free guitar practice app with your chords on camera'; try { if (navigator.share) await navigator.share({ title: 'ChordClicks', text, url }); else { await navigator.clipboard.writeText(url); toast('Link copied — thanks for sharing!'); } } catch (e) {} };
