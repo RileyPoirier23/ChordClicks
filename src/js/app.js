@@ -178,7 +178,7 @@
       if (sl === 0 && idx > 0) { bar++; if (P.autoc && prog.length) advanceSched(); }
       const cpi = schedPi, bn = bar, muted = TR.silent && (bar % (TR.silPlay + TR.silMute)) >= TR.silPlay, ac = TR.acc[b % TR.acc.length] || 'x';
       if (!muted && ac !== '.') { RCC.audio.click(t, ac === 'X' && isBeat, !isBeat, P.vol); }
-      if (TR.backing) RCC.backing.step({ t, s: sl, sub, beats, chord: prog[cpi] ? prog[cpi].c : '', style: TR.bstyle, vol: TR.bvol, comp: TR.bcomp, patChar: pat.length ? pat[idx % pat.length] : '' });
+      if (TR.backing) RCC.backing.step({ t, s: sl, sub, beats, bpm: curBpm(), chord: prog[cpi] ? prog[cpi].c : '', nextChord: prog[cpi + 1] ? prog[cpi + 1].c : '', style: TR.bstyle, vol: TR.bvol, comp: TR.bcomp, patChar: pat.length ? pat[idx % pat.length] : '', first: bar === 0, fillBar: !!(prog[cpi + 1] && prog[cpi + 1].sec !== prog[cpi].sec) });
       // solo follows the song's own timeline
       const wantSolo = inSolo(cpi); if (wantSolo && (!soloOn || prog[cpi].sec !== soloSec)) { soloStart = idx; soloSec = prog[cpi].sec; } soloOn = wantSolo;
       const soloBeat = wantSolo ? (idx - soloStart) / sub : -1;
@@ -230,6 +230,11 @@
   $('bvol').oninput = e => { TR.bvol = +e.target.value; saveTR(); }; $('bcomp').onchange = e => { TR.bcomp = e.target.checked; saveTR(); };
 
   /* ---- sheet editing ---- */
+  $('planb').onclick = () => RCC.plan.open(); $('stageb').onclick = () => RCC.stage.open(); $('ug-audio').onclick = () => RCC.transcribe.open();
+  $('bwav').onclick = async () => { if (!prog.length) { toast('Load a song with chords first'); return; } if (!RCC.pro.gate('trainer')) return; const b = $('bwav'); b.disabled = true; b.textContent = 'Rendering…';
+    try { const blob = await RCC.backing.renderWav({ prog, bpm: P.bpm, beats: +$('beats').value, sub: +$('sub').value, style: TR.bstyle, pat: $('pat').value.replace(/[^DU\-]/gi, ''), comp: TR.bcomp, vol: TR.bvol, countIn: 1 }); const name = ((song && song.title) || 'backing').replace(/[^\w\- ]/g, '_') + ' (backing ' + TR.bstyle + ').wav';
+      if (RCC.record && RCC.record.exportFile) await RCC.record.exportFile(blob, name); else { const u = URL.createObjectURL(blob), a = document.createElement('a'); a.href = u; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(u), 5000); } toast('Backing track saved'); }
+    catch (e) { toast('Could not render: ' + (e.message || e)); } b.disabled = false; b.textContent = 'Export WAV'; };
   $('editb').onclick = () => { const ed = $('pastewrap').style.display === 'none'; $('pastewrap').style.display = ed ? 'flex' : 'none'; $('sheet').style.display = ed ? 'none' : ''; $('secs').style.display = ed ? 'none' : ''; $('editb').textContent = ed ? 'Done' : 'Edit'; if (!ed) applyText(); };
   $('parse').onclick = () => { applyText(); $('editb').click(); };
   function applyText() {
@@ -309,12 +314,12 @@
     box.innerHTML = `<div class="row" style="margin:0 0 8px"><span class="pro-tag big">${st.kind === 'free' ? 'FREE' : 'PRO'}</span><b>${esc(st.label)}</b></div>
       ${st.kind === 'pro' ? `<div class="small">Thanks for supporting ChordClicks. Your key works offline on any of your devices.</div><div class="row"><button class="btn sm" id="pro-off">Remove key from this device</button></div>`
       : `<ul class="pro-list compact">${RCC.pro.FEATURES.map(f => `<li><b>${esc(f[1])}</b></li>`).join('')}</ul><div class="row">${RCC.pro.trialUsed() ? '' : `<button class="btn p" id="pro-try">Start ${RCC.pro.TRIAL_DAYS}-day trial</button>`}${RCC.pro.live() ? `<a class="btn ${RCC.pro.trialUsed() ? 'p' : ''}" href="${esc(RCC.pro.BUY_URL)}" target="_blank" rel="noreferrer">Buy Pro · ${esc(RCC.pro.PRICE)}</a>` : '<span class="small">Keys go on sale soon at 506clicks.ca</span>'}<button class="btn" id="pro-enter">Enter key</button></div>`}`;
-    const t = $('pro-try'); if (t) t.onclick = () => { RCC.pro.startTrial(); toast('Pro trial started'); };
+    const t = $('pro-try'); if (t) t.onclick = () => RCC.pro.trialDialog();
     const k = $('pro-enter'); if (k) k.onclick = () => RCC.pro.keyDialog();
     const o = $('pro-off'); if (o) o.onclick = async () => { if (await askConfirm('Remove the Pro key from this device?', 'Remove')) RCC.pro.deactivate(); };
     // PRO tags on gated controls
     const mark = (sel, f) => document.querySelectorAll(sel).forEach(el => RCC.pro.mark(el, f));
-    mark('#solo-mode [data-v=score], #solo-mode [data-v=wait]', 'score'); mark('#lp-rec', 'looper'); mark('#vcam', 'stream'); mark('#lib-pdf, #lib-notes', 'library');
+    mark('#solo-mode [data-v=score], #solo-mode [data-v=wait]', 'score'); mark('#lp-rec', 'looper'); mark('#vcam', 'stream'); mark('#lib-pdf, #lib-notes, #stageb', 'library'); mark('#planb, #bwav, #ug-audio', 'trainer');
     document.querySelectorAll('#ramp, #listen').forEach(i => RCC.pro.mark(i.closest('label'), 'trainer'));
     document.querySelectorAll('#ln-tabs [data-t=changes]').forEach(el => RCC.pro.mark(el, 'trainer'));
     document.querySelectorAll('#sc-tabs button:not([data-t=scales])').forEach(el => RCC.pro.mark(el, 'neck'));
@@ -598,7 +603,8 @@
     RCC.scales.init({ audio, toast, track: o => Store.track(o), drill: (text, name) => { if (RCC.solo.openTab(text, name)) show('solo'); }, accent: () => P.accent, jam: (text, title) => { loadSong(tempSong(title, text, { artist: 'Scale Lab' })); show('practice'); } });
     await Store.init(); await RCC.pro.init(); RCC.controls.init();
     renderAcct(); renderLib(); renderStreamUI();
-    if (R) R.version().then(v => { $('ver').textContent = $('ver2').textContent = 'v' + v; });
+    if (R) R.version().then(v => { $('ver').textContent = $('ver2').textContent = 'v' + v; }); else if (window.RCC_CHANGELOG) $('ver').textContent = $('ver2').textContent = 'v' + RCC_CHANGELOG[0].version;
+    if (RCC.whatsnew) setTimeout(() => RCC.whatsnew.maybe(), 1200);
     paintOnline(); paintPro(); paintProxy(); RCC.pro.onChange(() => { paintPro(); paintProxy(); renderLib(); });
     $('sup-pro').onclick = () => (RCC.pro.has() ? show('settings') : RCC.pro.upsell());
     if (!P.welcomed) setTimeout(welcome, 600); else setTimeout(() => RCC.pro.splash(), 900);

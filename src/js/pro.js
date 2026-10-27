@@ -62,7 +62,7 @@
       <ul class="pro-list compact">${FEATURES.map(x => `<li class="${x[0] === f ? 'hl' : ''}"><b>${a.esc(x[1])}</b></li>`).join('')}</ul>
       <div class="row" style="justify-content:space-between;margin-top:12px;gap:8px"><div class="row" style="margin:0;gap:8px">${trialUsed() ? '' : `<button class="btn p" id="sp-trial">Try Pro free for ${TRIAL_DAYS} days</button>`}${live() ? `<a class="btn ${trialUsed() ? 'p' : ''}" href="${a.esc(cfg.buy)}" target="_blank" rel="noreferrer">Buy Pro · ${a.esc(cfg.price)} once</a>` : ''}</div><button class="btn ghost" id="sp-x">Not now</button></div>
       <div class="small" style="margin-top:8px">${live() ? 'No subscription. Works offline on all your devices.' : 'Keys go on sale soon. Everything stays free to practise with.'}</div></div>`, () => {
-      document.getElementById('sp-x').onclick = a.closeDlg; const t = document.getElementById('sp-trial'); if (t) t.onclick = () => { startTrial(); a.closeDlg(); a.toast(`Pro trial started — ${TRIAL_DAYS} days of everything`); };
+      document.getElementById('sp-x').onclick = a.closeDlg; const t = document.getElementById('sp-trial'); if (t) t.onclick = () => trialDialog();
     });
     return true;
   }
@@ -70,7 +70,30 @@
     syncConfig(); if (st.lic && st.lic.key) { const r = await verify(st.lic.key); st.valid = r.ok; if (r.ok) { st.lic.name = r.name; lsSet('rcc-pro', st.lic); } } st.checked = true; emit(); }
   async function activate(key) { const r = await verify(key); if (r.ok) { st.lic = { key: String(key).trim(), name: r.name, since: Date.now() }; st.valid = true; lsSet('rcc-pro', st.lic); emit(); } return r; }
   function deactivate() { st.lic = null; st.valid = false; try { localStorage.removeItem('rcc-pro'); } catch (e) {} emit(); }
-  function startTrial() { if (trialUsed()) return false; st.trial = { start: Date.now() }; lsSet('rcc-trial', st.trial); emit(); return true; }
+  function startTrial(start, email) { if (trialUsed()) return false; st.trial = { start: start || Date.now(), email: email || '' }; lsSet('rcc-trial', st.trial); emit(); return true; }
+  /** The trial is tied to an email on the helper server, so wiping the app doesn't restart the clock. Offline (or no helper) it stays local. */
+  function trialDialog() {
+    const a = RCC.app; if (!a) return startTrial();
+    if (trialUsed()) return false;
+    const helper = (cfg.helper || '').replace(/\/+$/, ''), online = navigator.onLine !== false;
+    let saved = ''; try { saved = localStorage.getItem('rcc-email') || ''; } catch (e) {}
+    a.dialog(`<h2>Start your ${TRIAL_DAYS}-day Pro trial</h2><p class="small" style="line-height:1.5;margin:4px 0 10px">Everything unlocked, no card. Your email only marks the trial as used — no newsletter, nothing else.</p>
+      <div class="row"><input id="tr-email" class="grow" type="email" placeholder="you@example.com" value="${a.esc(saved)}" autocomplete="email"></div><div class="err" id="tr-err"></div>
+      <div class="row" style="justify-content:flex-end;gap:8px"><button class="btn ghost" id="tr-x">Cancel</button><button class="btn p" id="tr-go">Start trial</button></div>`, () => {
+      const i = document.getElementById('tr-email'); i.focus(); document.getElementById('tr-x').onclick = a.closeDlg;
+      const go = async () => {
+        const e = i.value.trim().toLowerCase(), err = document.getElementById('tr-err');
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e)) { err.textContent = 'Enter a real email address.'; return; }
+        try { localStorage.setItem('rcc-email', e); } catch (x) {}
+        let start = Date.now(); document.getElementById('tr-go').disabled = true;
+        if (helper && online) { try { const r = await fetch(helper + '/api/trial', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: e }), signal: AbortSignal.timeout(10000) }).then(x => x.json()); if (r && r.ok && r.start) start = r.start; } catch (x) {} }
+        startTrial(start, e); a.closeDlg();
+        const left = trialLeft(); a.toast(left > 0 ? `Pro trial started — ${left} day${left === 1 ? '' : 's'} of everything` : 'That email’s trial has already ended. Pro keys unlock everything.');
+      };
+      document.getElementById('tr-go').onclick = go; i.onkeydown = ev => { if (ev.key === 'Enter') go(); };
+    });
+    return true;
+  }
 
   /** Run fn when Pro (or trial) is active, otherwise show the upsell for that feature. Returns true when fn ran. */
   function gate(feature, fn) {
@@ -84,7 +107,7 @@
       <ul class="pro-list">${FEATURES.map(x => `<li class="${x[0] === feature ? 'hl' : ''}"><b>${esc(x[1])}</b><span>${esc(x[2])}</span></li>`).join('')}</ul>
       <div class="row" style="justify-content:space-between;margin-top:14px;gap:8px"><div class="row" style="margin:0;gap:8px">${trialUsed() ? '' : `<button class="btn p" id="pro-trial">Start ${TRIAL_DAYS}-day trial</button>`}${live() ? `<a class="btn ${trialUsed() ? 'p' : ''}" href="${esc(cfg.buy)}" target="_blank" rel="noreferrer">Buy Pro · ${esc(cfg.price)} once</a>` : ''}</div><button class="btn ghost" id="pro-key">I have a key</button></div>
       <div class="small" style="margin-top:10px">${live() ? 'One payment, yours forever, works offline. Your key comes by email.' : 'Pro keys go on sale soon at 506clicks.ca. The trial is the full thing in the meantime.'}</div>`, () => {
-      const t = document.getElementById('pro-trial'); if (t) t.onclick = () => { startTrial(); a.closeDlg(); a.toast(`Pro trial started — ${TRIAL_DAYS} days of everything`); };
+      const t = document.getElementById('pro-trial'); if (t) t.onclick = () => trialDialog();
       document.getElementById('pro-key').onclick = () => keyDialog();
     });
   }
@@ -102,5 +125,5 @@
   function mark(el, feature) { if (!el) return; let t = el.querySelector(':scope > .pro-tag'); if (has()) { t && t.remove(); return; } if (!t) { t = document.createElement('span'); t.className = 'pro-tag'; t.textContent = 'PRO'; t.title = (FEATURE_OF[feature] || [])[1] || 'ChordClicks Pro'; el.appendChild(t); } }
   const canAddSong = count => has() || count < FREE_SONGS;
 
-  RCC.pro = { init, has, status, gate, upsell, keyDialog, activate, deactivate, startTrial, trialLeft, trialUsed, mark, canAddSong, splash, live, config: () => cfg, FEATURES, FREE_SONGS, TRIAL_DAYS, get PRICE() { return cfg.price; }, get BUY_URL() { return cfg.buy; }, onChange: f => st._l.push(f) };
+  RCC.pro = { init, has, status, gate, upsell, keyDialog, activate, deactivate, startTrial, trialDialog, trialLeft, trialUsed, mark, canAddSong, splash, live, config: () => cfg, FEATURES, FREE_SONGS, TRIAL_DAYS, get PRICE() { return cfg.price; }, get BUY_URL() { return cfg.buy; }, onChange: f => st._l.push(f) };
 })();

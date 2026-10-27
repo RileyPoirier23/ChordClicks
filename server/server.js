@@ -58,6 +58,22 @@ function createServer({ dataDir = path.join(__dirname, '..', 'server-data'), all
     try { orders[sess.id].mailed = await sendKeyMail(email, name, key); wr(ordersFile, orders); } catch (e) {}
     return orders[sess.id];
   }
+  /** Square Payment Links: payment.updated / payment.created with status COMPLETED. Signature = base64(HMAC-SHA256(notificationUrl + body)). */
+  function squareSigOk(raw, header) {
+    const key = process.env.SQUARE_WEBHOOK_SIGNATURE_KEY, url = process.env.SQUARE_WEBHOOK_URL; if (!key || !url) return false;
+    const exp = crypto.createHmac('sha256', key).update(url + raw).digest('base64');
+    try { return crypto.timingSafeEqual(Buffer.from(exp), Buffer.from(String(header || ''))); } catch (e) { return false; }
+  }
+  async function keyForSquare(payment) {
+    if (!payment || payment.status !== 'COMPLETED') return null;
+    const orders = rd(ordersFile, {}), id = 'sq_' + payment.id; if (orders[id]) return orders[id];
+    const email = payment.buyer_email_address || '', name = (payment.shipping_address && payment.shipping_address.name) || (payment.billing_address && payment.billing_address.name) || '';
+    const key = await signKey({ n: String(name).slice(0, 40), e: String(email).slice(0, 60), i: Date.now(), x: 0, v: 1, s: String(payment.id).slice(-10) });
+    orders[id] = { key, email, name, at: Date.now(), mailed: false, square: true }; wr(ordersFile, orders);
+    try { orders[id].mailed = await sendKeyMail(email, name, key); wr(ordersFile, orders); } catch (e) {}
+    return orders[id];
+  }
+  const trialsFile = path.join(dataDir, 'trials.json');
   const rawBody = req => new Promise((res, rej) => { let n = 0; const ch = []; req.on('data', c => { n += c.length; if (n > 2e6) { rej(Object.assign(new Error('too large'), { code: 413 })); req.destroy(); } else ch.push(c); }); req.on('end', () => res(Buffer.concat(ch).toString())); });
   const body = req => new Promise((res, rej) => {
     let n = 0; const ch = [];
@@ -95,18 +111,41 @@ function createServer({ dataDir = path.join(__dirname, '..', 'server-data'), all
       }
       // Owner's panel (506clicks.ca/admin): needs ADMIN_TOKEN. Stats + manual key issue.
       const adminOk = q => process.env.ADMIN_TOKEN && q && crypto.timingSafeEqual(Buffer.from(String(q).padEnd(64).slice(0, 64)), Buffer.from(String(process.env.ADMIN_TOKEN).padEnd(64).slice(0, 64)));
-      if (url === '/api/admin/stats' || url === '/api/admin/issue') {
+      if (url === '/api/admin/stats' || url === '/api/admin/issue' || url === '/api/admin/export') {
         if (limited(ip, 30)) return out(res, 429, { ok: false, error: 'Too many requests' });
         const q = req.method === 'GET' ? new URL(req.url, 'http://x').searchParams.get('token') : (await body(req));
         const tok = typeof q === 'string' ? q : q && q.token; if (!adminOk(tok)) return out(res, 401, { ok: false, error: 'Bad admin token' });
+        if (url === '/api/admin/export') return out(res, 200, { ok: true, at: Date.now(), orders: rd(ordersFile, {}), trials: rd(trialsFile, {}), users: Object.keys(rd(usersFile, {})) });
         if (url === '/api/admin/stats') {
           const orders = Object.entries(rd(ordersFile, {})).map(([id, o]) => ({ id: id.slice(-8), at: o.at, email: String(o.email || '').replace(/^(.).*(@.*)$/, '$1…$2'), name: o.name, mailed: o.mailed, manual: !!o.manual })).sort((a, b) => b.at - a.at);
-          return out(res, 200, { ok: true, orders: orders.slice(0, 50), count: orders.length, users: Object.keys(rd(usersFile, {})).length, stripe: !!process.env.STRIPE_SECRET_KEY, mail: !!process.env.RESEND_API_KEY, signing: !!process.env.LICENCE_PRIVATE_JWK });
+          return out(res, 200, { ok: true, orders: orders.slice(0, 50), count: orders.length, users: Object.keys(rd(usersFile, {})).length, trials: Object.keys(rd(trialsFile, {})).length, stripe: !!process.env.STRIPE_SECRET_KEY, square: !!process.env.SQUARE_WEBHOOK_SIGNATURE_KEY, mail: !!process.env.RESEND_API_KEY, signing: !!process.env.LICENCE_PRIVATE_JWK });
         }
         const { name = '', email = '' } = q || {}; const key = await signKey({ n: String(name).slice(0, 40), e: String(email).slice(0, 60), i: Date.now(), x: 0, v: 1 });
         const orders = rd(ordersFile, {}); const id = 'manual_' + Date.now(); orders[id] = { key, email, name, at: Date.now(), mailed: false, manual: true };
         try { orders[id].mailed = email ? await sendKeyMail(email, name, key) : false; } catch (e) {} wr(ordersFile, orders);
         return out(res, 200, { ok: true, key, mailed: orders[id].mailed });
+      }
+      if (req.method === 'POST' && url === '/api/square/webhook') {
+        const raw = await rawBody(req); if (!squareSigOk(raw, req.headers['x-square-hmacsha256-signature'])) return out(res, 400, { ok: false, error: 'Bad signature' });
+        const ev = JSON.parse(raw); const pay = ev && ev.data && ev.data.object && ev.data.object.payment;
+        if (/^payment\.(created|updated)$/.test(ev.type || '') && pay) { try { await keyForSquare(pay); } catch (e) { console.error('square key failed', e.message); } }
+        return out(res, 200, { received: true });
+      }
+      // Weekly progress report, sent on request from the app (Resend)
+      if (req.method === 'POST' && url === '/api/report') {
+        if (limited('r:' + ip, 5)) return out(res, 429, { ok: false, error: 'Too many requests' });
+        const { email, html, subject } = await body(req); const e = norm(email); if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e)) return out(res, 400, { ok: false, error: 'Enter a real email address.' });
+        if (!process.env.RESEND_API_KEY || !process.env.MAIL_FROM) return out(res, 500, { ok: false, error: 'Email isn’t set up on the server yet.' });
+        const safe = String(html || '').slice(0, 60000).replace(/<script[\s\S]*?<\/script>/gi, '').replace(/ on\w+="[^"]*"/g, '');
+        const r = await fetch('https://api.resend.com/emails', { method: 'POST', headers: { authorization: 'Bearer ' + process.env.RESEND_API_KEY, 'content-type': 'application/json' }, body: JSON.stringify({ from: process.env.MAIL_FROM, to: [e], subject: String(subject || 'Your ChordClicks week').slice(0, 120), html: safe }), signal: AbortSignal.timeout(15000) });
+        return out(res, r.ok ? 200 : 502, { ok: r.ok });
+      }
+      // Pro trial: one per email, so clearing the app's storage doesn't restart the clock. Returns the original start.
+      if (req.method === 'POST' && url === '/api/trial') {
+        if (limited('t:' + ip, 10)) return out(res, 429, { ok: false, error: 'Too many requests' });
+        const { email } = await body(req); const e = norm(email); if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e)) return out(res, 400, { ok: false, error: 'Enter a real email address.' });
+        const trials = rd(trialsFile, {}); const h = sha(e); if (!trials[h]) { trials[h] = { start: Date.now(), e: e.replace(/^(.).*(@.*)$/, '$1…$2') }; wr(trialsFile, trials); }
+        return out(res, 200, { ok: true, start: trials[h].start });
       }
       if (req.method === 'POST' && url === '/api/stripe/webhook') {
         const raw = await rawBody(req); if (!stripeSigOk(raw, req.headers['stripe-signature'])) return out(res, 400, { ok: false, error: 'Bad signature' });

@@ -73,7 +73,7 @@
      <div class="card sheetcard">
       <div class="sh-head"><b id="sh-title">Chord sheet</b>
        <label class="tg" title="Keep the current chord in view"><span class="sw"><input type="checkbox" id="follow" checked><i></i></span>Follow</label>
-       <button class="btn sm" id="xpose" title="Transpose, capo helper, key">Key / Capo</button><button class="btn sm" id="editb">Edit</button></div>
+       <button class="btn sm" id="xpose" title="Transpose, capo helper, key">Key / Capo</button><button class="btn sm" id="planb" title="A short routine built for this song">Plan</button><button class="btn sm" id="stageb" title="Full-screen sheet with pedal page turns">Stage</button><button class="btn sm" id="editb">Edit</button></div>
       <div id="secs"></div>
       <div id="sheet">Paste a chord sheet with Edit, or import one from Ultimate Guitar in Find.</div>
       <div id="pastewrap" style="display:none;flex:1;flex-direction:column;min-height:0"><textarea id="paste" spellcheck="false" placeholder="Paste chords or tab text (also works with [ch]Am[/ch])"></textarea>
@@ -100,7 +100,7 @@
       <div class="row"><label class="l">Accents</label><select id="accpat" class="grow"><option value="Xxxx">Beat 1 accented</option><option value="XxXx">1 &amp; 3 strong</option><option value="xXxX">Backbeat (2 &amp; 4)</option><option value="XXXX">Every beat strong</option><option value="X...">Click only on 1</option><option value="xxxx">No accent</option></select><label class="tg"><span class="sw"><input type="checkbox" id="flash" checked><i></i></span>Flash</label></div>
       <div class="row"><label class="tg" title="Mutes the click for some bars so you have to keep time yourself"><span class="sw"><input type="checkbox" id="silent"><i></i></span>Silent bars</label><span class="small">play</span><input type="number" id="sil-play" min="1" max="16" value="3" style="width:54px"><span class="small">mute</span><input type="number" id="sil-mute" min="1" max="8" value="1" style="width:54px"></div>
       <div class="row"><label class="tg"><span class="sw"><input type="checkbox" id="backing"><i></i></span>Backing track</label><select id="bstyle" class="grow"></select></div>
-      <div class="row"><label class="l">Volume</label><input type="range" id="bvol" min="0" max="1" step=".05" value=".6"><label class="tg" title="Plays the strumming pattern too, so you can solo or sing over it"><span class="sw"><input type="checkbox" id="bcomp"><i></i></span>Strum for me</label></div>
+      <div class="row"><label class="l">Volume</label><input type="range" id="bvol" min="0" max="1" step=".05" value=".6"><label class="tg" title="Plays the strumming pattern too, so you can solo or sing over it"><span class="sw"><input type="checkbox" id="bcomp"><i></i></span>Strum for me</label><button class="btn sm" id="bwav" title="Render the backing track for this song to a WAV file">Export WAV</button></div>
      </div>
     </div>
    </section>
@@ -131,7 +131,7 @@
      <span class="small">Save to</span>
      <input id="imp-genre" list="genres" placeholder="Genre" style="width:120px"><datalist id="genres"></datalist>
      <select id="imp-pl"></select>
-     <button class="btn sm" id="imp-paste" title="Paste text from any website or file">Paste instead…</button>
+     <button class="btn sm" id="imp-paste" title="Paste text from any website or file">Paste instead…</button><button class="btn sm" id="ug-audio" title="Pick an MP3 or WAV and get a timed chord sheet">Chords from a recording</button>
     </div>
     <div class="card hint" id="find-off" hidden><b>You’re offline.</b> Ultimate Guitar needs a connection. Everything you’ve already imported is in your <u id="find-off-lib" style="cursor:pointer">Library</u> and works without Wi-Fi.</div>
     <div class="find-body">
@@ -199,7 +199,8 @@
 
    <!-- ============ LEARN ============ -->
    <section class="view" id="v-learn">
-    <div class="seg wide" id="ln-tabs"><button data-t="chords" class="on">Chord library</button><button data-t="changes">Chord changes</button><button data-t="ear">Ear training</button><button data-t="finger">Fingerpicking</button><button data-t="theory">Theory</button><button data-t="progress">Progress</button></div>
+    <div class="seg wide" id="ln-tabs"><button data-t="chords" class="on">Chord library</button><button data-t="changes">Chord changes</button><button data-t="ear">Ear training</button><button data-t="finger">Fingerpicking</button><button data-t="paths">Paths</button><button data-t="theory">Theory</button><button data-t="progress">Progress</button></div>
+    <div class="ln-pane" id="ln-paths"></div>
     <div class="ln-pane on" id="ln-chords"></div>
     <div class="ln-pane" id="ln-changes"></div>
     <div class="ln-pane" id="ln-ear"></div>
@@ -260,6 +261,7 @@
         <label class="tg"><span class="sw"><input type="checkbox" id="lp-count" checked><i></i></span>Count-in</label>
         <label class="l" title="Shift recorded audio earlier to cancel your sound card's delay">Latency fix</label><input type="number" id="lp-comp" value="0" min="0" max="300" style="width:70px"><span class="small">ms</span></div>
        <div class="small">Tempo and beats come from the Practice metronome. Loops are captured on the audio thread, sample-accurate, after the pedals and amp — so overdubs keep your tone and the seam stays tight. Turn on <b>Monitor</b> (with headphones) to hear yourself while recording.</div>
+       <div class="small" id="lp-diag"></div>
        <div id="lp-layers"></div></div></div></div>
     <div class="g-pane" id="gp-rec"><div class="card pad">
       <div class="row"><button class="btn p big" id="rc-btn">● Start recording</button><b id="rc-time" style="font-variant-numeric:tabular-nums;font-size:20px">0:00</b></div>
@@ -395,6 +397,8 @@
 <script src="src/lib/pitch.js"></script>
 <script src="src/lib/song.js"></script>
 <script src="src/lib/chroma.js"></script>
+<script src="src/lib/chordsfromaudio.js"></script>
+<script src="src/changelog.js"></script>
 <script src="src/lib/sync.js"></script>
 <script src="src/lib/requests.js"></script>
 <script src="src/js/audio.js"></script>
@@ -413,6 +417,11 @@
 <script src="src/js/controls.js"></script>
 <script src="src/js/fingerpick.js"></script>
 <script src="src/js/learn.js"></script>
+<script src="src/js/plan.js"></script>
+<script src="src/js/report.js"></script>
+<script src="src/js/stage.js"></script>
+<script src="src/js/transcribe.js"></script>
+<script src="src/js/whatsnew.js"></script>
 <script src="src/js/scales.js"></script>
 <script src="src/js/app.js"></script>
 </body></html>

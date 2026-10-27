@@ -78,3 +78,9 @@ Only a code-signing certificate removes the "Unknown publisher" SmartScreen warn
 ## Accounts
 Accounts are local to the computer (scrypt-hashed passwords; libraries in
 `%APPDATA%\ChordClicks\accounts`). Use Settings → Export songs to back up, or cloud sync.
+
+### Helper server endpoints added in 3.4
+- `POST /api/trial` `{email}` — starts (or returns) the Pro trial for that email, so wiping the app doesn't restart it.
+- `POST /api/report` `{email, subject, html}` — emails the weekly progress report (needs `RESEND_API_KEY` + `MAIL_FROM`).
+- `POST /api/square/webhook` — Square `payment.updated` → key issued and emailed (needs `SQUARE_WEBHOOK_SIGNATURE_KEY` + `SQUARE_WEBHOOK_URL`). See `docs/CHECKOUT.md`.
+- `GET /api/admin/export?token=…` — orders, trials and sync accounts as JSON for backups (the website's nightly gist backup pulls this when `HELPER_URL` + `HELPER_ADMIN_TOKEN` are set there).
