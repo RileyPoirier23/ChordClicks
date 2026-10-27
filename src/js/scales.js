@@ -215,5 +215,5 @@
     try { const old = JSON.parse(localStorage.getItem('rcc-learned') || '{}'); Object.keys(old).forEach(r => { if (old[r]) S_().lib.scales[lkey(r, 'major')] = S_().lib.scales[lkey(r, 'major')] || 1; }); localStorage.removeItem('rcc-learned'); } catch (e) {}
     refresh(); new ResizeObserver(draw).observe($('scfret')); S_().on(() => { if ($('v-scales').classList.contains('on')) refresh(); });
   }
-  RCC.scales = { init, redraw: () => { refresh(); } };
+  RCC.scales = { init, redraw: () => { refresh(); }, open: (root, type) => { st.root = +root; st.type = type || 'major'; st.tab = 'scales'; refresh(); } };
 })();

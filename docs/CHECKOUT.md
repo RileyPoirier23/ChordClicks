@@ -43,6 +43,10 @@ Switch the three Stripe values to live when happy.
 ## Manual sales (no Stripe)
 `node scripts/licence.mjs issue "Buyer Name" --email buyer@example.com` prints a key to send yourself.
 
-## Square instead of Stripe?
-Square Online payment links work for taking the money, but the automatic key step here is written for Stripe's
-webhook format. With Square you'd issue keys manually from the order email, or ask for a Square webhook version.
+## Square (automatic keys too)
+1. Square Dashboard → Online → Payment Links → "ChordClicks Pro" $24.99. Put the link in the owner panel (Checkout link) and tick "Pro is on sale".
+2. developer.squareup.com → your application → Webhooks → Add subscription: URL `https://<your-server>/api/square/webhook`,
+   events `payment.created` and `payment.updated`. Copy the **Signature key**.
+3. On Render add `SQUARE_WEBHOOK_SIGNATURE_KEY` = that key and `SQUARE_WEBHOOK_URL` = the exact webhook URL you typed (Square signs with it).
+4. Each completed payment issues a key and emails it to the buyer's Square email (Resend required for the email; the key is also in the owner panel's order list).
+Buyers don't land on the thank-you page with Square, so the email is the delivery.

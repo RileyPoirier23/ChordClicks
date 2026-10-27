@@ -22,7 +22,7 @@
     const el = $('ln-changes'), key = () => [cc.a, cc.b].sort().join('|'), rec = () => (stats().changes || {})[key()];
     const r = rec();
     el.innerHTML = `<div class="ln-card card"><div class="row" style="margin:0"><b style="font-size:17px">Chord change trainer</b><span class="small">How fast can you switch? Pick two chords, play whichever one is shown, and the app listens for the switch.</span></div>
-      <div class="row"><label class="l">Chords</label><select id="cc-a">${PAIRS.flatMap(p => p).filter((x, i, a) => a.indexOf(x) === i).map(c => `<option ${c === cc.a ? 'selected' : ''}>${c}</option>`).join('')}</select><span>⇄</span><select id="cc-b">${PAIRS.flatMap(p => p).filter((x, i, a) => a.indexOf(x) === i).map(c => `<option ${c === cc.b ? 'selected' : ''}>${c}</option>`).join('')}</select>
+      <div class="row"><label class="l">Chords</label><select id="cc-a">${[...PAIRS.flatMap(p => p), cc.a, cc.b].filter((x, i, a) => a.indexOf(x) === i).map(c => `<option ${c === cc.a ? 'selected' : ''}>${c}</option>`).join('')}</select><span>⇄</span><select id="cc-b">${[...PAIRS.flatMap(p => p), cc.a, cc.b].filter((x, i, a) => a.indexOf(x) === i).map(c => `<option ${c === cc.b ? 'selected' : ''}>${c}</option>`).join('')}</select>
        <span class="small">Quick pairs:</span>${PAIRS.slice(0, 6).map((p, i) => `<span class="chip" data-p="${i}">${p[0]}⇄${p[1]}</span>`).join('')}</div>
       <div class="row"><label class="l">Length</label><div class="seg sm" id="cc-len">${[30, 60, 120].map(n => `<button data-v="${n}" class="${cc.secs === n ? 'on' : ''}">${n}s</button>`).join('')}</div>
        <label class="l">Detect by</label><div class="seg sm" id="cc-mode"><button data-v="mic" class="${cc.mode === 'mic' ? 'on' : ''}">Listen to my guitar</button><button data-v="tap" class="${cc.mode === 'tap' ? 'on' : ''}">I'll tap / press Space</button></div></div>
@@ -56,7 +56,7 @@
     const n = run.times.length, elapsed = Math.max(1, (performance.now() - (run.tStart || performance.now())) / 1000), cpm = run.begun ? n / elapsed * 60 : 0;
     if (!n) { $('cc-stage').style.display = 'none'; D.toast('No changes detected. Check your mic level, or use tap mode.'); return; }
     const key = [cc.a, cc.b].sort().join('|'), st = stats(); st.changes = st.changes || {}; const r = (st.changes[key] = st.changes[key] || { best: 0, hist: [] });
-    const prevBest = r.best; r.best = Math.max(r.best, +cpm.toFixed(1)); r.hist.push(+cpm.toFixed(1)); r.hist = r.hist.slice(-30); touch(); D.track({ sec: elapsed, drill: 'chord-change' });
+    const prevBest = r.best; r.best = Math.max(r.best, +cpm.toFixed(1)); r.hist.push(+cpm.toFixed(1)); r.hist = r.hist.slice(-30); r.at = Date.now(); touch(); D.track({ sec: elapsed, drill: 'chord-change' });
     const avg = run.times.reduce((a, b) => a + b, 0) / n, best = Math.min(...run.times);
     $('cc-stage').style.display = 'none'; const res = $('cc-res'); res.style.display = 'block';
     res.innerHTML = `<div class="stat-grid"><div class="card stat"><b>${cpm.toFixed(1)}</b><span>changes / minute${cpm > prevBest && prevBest ? ' — new best! 🎉' : ''}</span></div><div class="card stat"><b>${n}</b><span>clean changes</span></div><div class="card stat"><b>${avg.toFixed(2)}s</b><span>average switch</span></div><div class="card stat"><b>${best.toFixed(2)}s</b><span>fastest switch</span></div></div>
@@ -165,19 +165,58 @@
     $('ln-progress').innerHTML = `<div class="stat-grid"><div class="card stat"><b>🔥 ${sk.current}</b><span>day streak · best ${sk.best}</span></div><div class="card stat"><b>${fmtMin(tdy)}</b><span>today</span></div><div class="card stat"><b>${fmtMin(week)}</b><span>last 7 days</span></div><div class="card stat"><b>${fmtMin(tot.sec)}</b><span>all time</span></div><div class="card stat"><b>${tot.songs}</b><span>songs played</span></div><div class="card stat"><b>${S().knownCount()}</b><span>chords known</span></div><div class="card stat"><b>${S().learnedScaleCount()}</b><span>scales learned</span></div><div class="card stat"><b>${Object.keys(st.lessons || {}).length}/${LESSONS.length}</b><span>lessons done</span></div></div>
      <div class="card ln-card" style="margin-top:12px"><b>Last 26 weeks</b><div class="small" style="margin-bottom:8px">A day counts toward your streak after 1 minute of practice or playing a song.</div><div class="heat">${cells.join('')}</div></div>
      <div class="card ln-card"><b>Personal bests</b><div class="chain" style="margin-top:8px">${[...scores.map(([k, v]) => `<div class="dch"><b>${v}%</b><small>${esc(k).slice(0, 34)}</small></div>`), ...ch.map(([k, r]) => `<div class="dch"><b>${r.best}/min</b><small>${k.replace('|', ' ⇄ ')}</small></div>`), ...Object.entries(st.ear || {}).map(([k, v]) => `<div class="dch"><b>${v}/10</b><small>ear · ${k}</small></div>`)].join('') || '<span class="small">Play along in Solo (Score mode), run a chord-change drill, or do an ear round and your bests show up here.</span>'}</div></div>
+     <div class="card ln-card"><div class="row" style="justify-content:space-between;margin:0"><b>This week</b><button class="btn sm" id="pg-report">Weekly report</button></div><div class="small" style="margin-top:6px">${esc(RCC.report ? RCC.report.compute(S().lib).note : '')}</div></div>
      <div class="card ln-card"><b>Achievements</b><div class="chain" style="margin-top:8px">${ACH.map(([id, n, ok]) => `<div class="dch" style="opacity:${ok ? 1 : .35}"><b>${ok ? '🏅' : '🔒'} ${n}</b></div>`).join('')}</div></div>`;
+    const rb = $('pg-report'); if (rb) rb.onclick = () => RCC.report.open();
   }
+
+  /* ================================================================ PATHS (lesson packs) */
+  const PATHS = [
+    { id: 'first', title: 'Your first 10 songs', free: true, blurb: 'Eight open chords, the changes between them, and a strum you can keep. Two weeks if you do a little every day.',
+      steps: [['lesson', 'keys'], ['chord', 'G'], ['chord', 'C'], ['chord', 'D'], ['change', 'G', 'C'], ['change', 'G', 'D'], ['chord', 'Em'], ['chord', 'Am'], ['change', 'C', 'Am'], ['chord', 'E'], ['chord', 'A'], ['change', 'Em', 'A'], ['chord', 'Dm'], ['finger', 0], ['ear', 'interval']] },
+    { id: 'barre', title: 'Barre chords', blurb: 'F and B minor stop being the enemy. E and A shapes moved up the neck, then the changes that use them.',
+      steps: [['lesson', 'nashville'], ['chord', 'F'], ['change', 'F', 'C'], ['chord', 'Bm'], ['change', 'Bm', 'G'], ['chord', 'B'], ['chord', 'F#m'], ['change', 'F#m', 'D'], ['chord', 'Bb'], ['chord', 'Cm'], ['scale', '0:major']] },
+    { id: 'fingerstyle', title: 'Fingerstyle foundations', blurb: 'Thumb independence, the p-i-m-a patterns everybody uses, and the chords that ring under them.',
+      steps: [['chord', 'Am'], ['chord', 'C'], ['finger', 0], ['finger', 1], ['finger', 2], ['chord', 'Cadd9'], ['chord', 'Em7'], ['finger', 3], ['finger', 4], ['change', 'Am', 'C'], ['finger', 5]] },
+    { id: 'lead', title: 'Lead guitar: pentatonic to solo', blurb: 'Minor pentatonic in every position, the major scale on top, bends and slides, then a scored solo.',
+      steps: [['scale', '9:minor pentatonic'], ['scale', '4:minor pentatonic'], ['lesson', 'keys'], ['scale', '7:major'], ['scale', '0:major'], ['ear', 'interval'], ['ear', 'chord'], ['scale', '2:minor pentatonic'], ['solo']] },
+    { id: 'theory', title: 'Theory that you actually use', blurb: 'Keys, numbers, why chords go where they go, and training your ear to hear it before you play it.',
+      steps: [['lesson', 'keys'], ['lesson', 'nashville'], ['ear', 'interval'], ['ear', 'chord'], ['scale', '0:major'], ['scale', '9:minor'], ['ear', 'progression']] },
+  ];
+  const SC_NAME = k => { const [r, s] = k.split(':'); return NAMES(+r) + ' ' + s; };
+  function stepInfo(s) {
+    const st = stats();
+    if (s[0] === 'lesson') { const l = LESSONS.find(x => x.id === s[1]); return { label: 'Lesson · ' + (l ? l.title : s[1]), done: !!(st.lessons || {})[s[1]], go: () => { lesson = l || null; show('theory'); } }; }
+    if (s[0] === 'chord') return { label: 'Learn ' + s[1], done: S().knows(s[1]), go: () => { RCC.chords.select(s[1]); show('chords'); } };
+    if (s[0] === 'change') { const r = (st.changes || {})[[s[1], s[2]].sort().join('|')]; return { label: `${s[1]} ⇄ ${s[2]} at 20/min`, done: !!(r && r.best >= 20), sub: r ? 'best ' + r.best : '', go: () => changes(s[1], s[2]) }; }
+    if (s[0] === 'finger') { const P = (RCC.fingerpick.PATTERNS || [])[s[1]]; return { label: 'Fingerpick · ' + (P ? P.name : 'pattern ' + (s[1] + 1)), done: !!(P && (st.finger || {})[P.id]), go: () => { show('finger'); if (P) RCC.fingerpick.select(P.id); } }; }
+    if (s[0] === 'ear') { const k = { interval: 'int', chord: 'chord', progression: 'prog' }[s[1]] || s[1]; return { label: 'Ear · ' + s[1] + 's, 7/10', done: ((st.ear || {})[k] || 0) >= 7, go: () => { ear.kind = k; show('ear'); } }; }
+    if (s[0] === 'scale') return { label: 'Scale · ' + SC_NAME(s[1]), done: S().scaleLearned(s[1]), go: () => { const [r, t] = s[1].split(':'); RCC.scales.open(+r, t); RCC.app.show('scales'); } };
+    if (s[0] === 'solo') return { label: 'Score 80% on a solo', done: Object.values(st.best || {}).some(v => v >= 80), go: () => { RCC.app.show('solo'); $('solo-demo').click(); } };
+    return { label: s.join(' '), done: false, go: () => {} };
+  }
+  let pathOpen = null;
+  function pathsUI() {
+    const el = $('ln-paths'); if (!el) return; const pro = !RCC.pro || RCC.pro.has();
+    if (!pathOpen) { el.innerHTML = `<div class="small" style="margin-bottom:10px">A path is a lesson pack: chords, changes, drills and lessons in the order that works. Ticks come from what you actually do in the app.</div><div class="paths">${PATHS.map(p => { const info = p.steps.map(stepInfo), done = info.filter(i => i.done).length; return `<button class="card path ${!p.free && !pro ? 'locked' : ''}" data-p="${p.id}"><div class="row" style="justify-content:space-between;margin:0"><b>${esc(p.title)}</b>${p.free ? '<span class="tag">Free</span>' : pro ? '' : '<span class="pro-tag">PRO</span>'}</div><div class="small" style="margin:6px 0">${esc(p.blurb)}</div><div class="bar"><i style="width:${Math.round(done / p.steps.length * 100)}%"></i></div><div class="small">${done}/${p.steps.length} done</div></button>`; }).join('')}</div>`;
+      el.querySelectorAll('[data-p]').forEach(b => b.onclick = () => { const p = PATHS.find(x => x.id === b.dataset.p); if (!p.free && RCC.pro && !RCC.pro.gate('trainer')) return; pathOpen = p; pathsUI(); }); return; }
+    const p = pathOpen, info = p.steps.map(stepInfo), next = info.findIndex(i => !i.done);
+    el.innerHTML = `<div class="row" style="justify-content:space-between"><button class="btn sm" id="pt-back">← Paths</button><b>${esc(p.title)}</b><span class="small">${info.filter(i => i.done).length}/${info.length}</span></div><div class="small" style="margin:4px 0 10px">${esc(p.blurb)}</div>
+      <ol class="plan">${info.map((i, k) => `<li class="${i.done ? 'done' : k === next ? 'next' : ''}"><span class="pl-ic">${i.done ? '✓' : k + 1}</span><div class="grow"><b>${esc(i.label)}</b>${i.sub ? ` <span class="small">${esc(i.sub)}</span>` : ''}</div><button class="btn sm ${k === next ? 'p' : ''}" data-s="${k}">${i.done ? 'Again' : 'Go'}</button></li>`).join('')}</ol>`;
+    $('pt-back').onclick = () => { pathOpen = null; pathsUI(); }; el.querySelectorAll('[data-s]').forEach(b => b.onclick = () => info[+b.dataset.s].go());
+  }
+  function changes(a, b) { cc.a = a; cc.b = b; show('changes'); }
 
   /* ================================================================ shell */
   function show(t) {
     tab = t; if (stopChange) stopChange(); if (t !== 'finger' && RCC.fingerpick) RCC.fingerpick.stop();
     document.querySelectorAll('#ln-tabs button').forEach(b => b.classList.toggle('on', b.dataset.t === t)); document.querySelectorAll('.ln-pane').forEach(p => p.classList.toggle('on', p.id === 'ln-' + t));
-    if (t === 'chords') RCC.chords.redraw(); else if (t === 'changes' && !(cc.run && !cc.run.done)) changesUI(); else if (t === 'ear') earUI(); else if (t === 'finger') RCC.fingerpick.redraw(); else if (t === 'theory') theoryUI(); else if (t === 'progress') progressUI();
+    if (t === 'chords') RCC.chords.redraw(); else if (t === 'changes' && !(cc.run && !cc.run.done)) changesUI(); else if (t === 'ear') earUI(); else if (t === 'finger') RCC.fingerpick.redraw(); else if (t === 'theory') theoryUI(); else if (t === 'progress') progressUI(); else if (t === 'paths') pathsUI();
   }
   function init(deps) {
     D = deps; D.jam = deps.jam; document.querySelectorAll('#ln-tabs button').forEach(b => b.onclick = () => show(b.dataset.t));
     RCC.chords.build($('ln-chords'), { accent: D.accent, useChord: n => D.useChord && D.useChord(n) });
     if (RCC.fingerpick) RCC.fingerpick.init(D);
   }
-  RCC.learn = { init, show, redraw: () => show(tab), setDeps: o => Object.assign(D, o), openChord: n => { RCC.chords.select(n); show('chords'); } };
+  RCC.learn = { init, show, redraw: () => show(tab), setDeps: o => Object.assign(D, o), openChord: n => { RCC.chords.select(n); show('chords'); }, changes, PATHS };
 })();

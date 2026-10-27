@@ -96,5 +96,5 @@
     $('fp-done').onclick = () => { const s = S().lib.stats; s.finger = s.finger || {}; s.finger[p.id] = Date.now(); s.updated = Date.now(); S().save(); if (D.track) D.track({ drill: 'fingerpick' }); D.toast('Pattern learned ✓'); render(); };
     paintGrid();
   }
-  RCC.fingerpick = { init: deps => { D = deps; }, redraw: () => { if (!built) built = true; render(); }, stop, PATTERNS, tabText };
+  RCC.fingerpick = { init: deps => { D = deps; }, redraw: () => { if (!built) built = true; render(); }, stop, PATTERNS, tabText, select: id => { if (PATTERNS.some(p => p.id === id)) { stop(); st.pat = id; built = true; render(); } } };
 })();

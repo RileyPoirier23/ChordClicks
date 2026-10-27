@@ -130,5 +130,6 @@
       else if (prevSize && !A.recorder.active()) { D.setOutputSize(prevSize[0], prevSize[1]); prevSize = null; portrait = false; $('rec-stage').classList.remove('portrait'); }
     },
     recording: () => A.recorder.active(),
+    exportFile,
   };
 })();

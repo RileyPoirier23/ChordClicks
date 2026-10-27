@@ -226,3 +226,14 @@ test('pitch refinement keeps the YIN estimate and sharpens it on a noisy guitar-
   assert.ok(Math.abs(1200 * Math.log2(fr / f)) < 1.5, 'refined within 1.5 cents: ' + fr);
   assert.ok(Math.abs(1200 * Math.log2(fr / f)) <= Math.abs(1200 * Math.log2(y.freq / f)) + .5);
 });
+
+const CA = require('../src/lib/chordsfromaudio.js');
+test('chords from audio: synthetic progression comes back in order with the right key', () => {
+  const sr = 22050, prog = ['G', 'D', 'Em', 'C', 'G', 'D', 'C', 'G'];
+  const r = CA.analyze(CA.synth(prog, 1.5, sr), sr, { bpm: 80 });
+  assert.deepStrictEqual(r.segments.map(s => s.chord), prog);
+  assert.strictEqual(r.key && r.key.name, 'G');
+  assert.ok(Math.abs(r.segments[1].t - 1.5) < 0.3, 'second chord starts near 1.5s: ' + r.segments[1].t);
+  const sheet = CA.toSheet(r, 'Test'); assert.match(sheet, /^\[Test\]  \(key G\)\n0:00  G   D   Em   C\n0:0[56]  G   D   C   G$/);
+});
+test('chords from audio: silence gives nothing', () => { const r = CA.analyze(new Float32Array(22050 * 3), 22050); assert.deepStrictEqual(r.segments, []); assert.strictEqual(r.key, null); });

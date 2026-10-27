@@ -1,7 +1,7 @@
 {
   "name": "chordclicks",
   "productName": "ChordClicks",
-  "version": "3.3.1",
+  "version": "3.4.0",
   "description": "Practice songs, scales and solos with chords burned into your camera feed.",
   "author": {
     "name": "Riley Mackay-Poirier",
@@ -16,7 +16,8 @@
     "dist": "electron-builder --win --publish never",
     "dist:portable": "electron-builder --win portable --publish never",
     "server": "node server/server.js",
-    "web": "node scripts/build-web.mjs",
+    "changelog": "node scripts/changelog.mjs",
+    "web": "node scripts/changelog.mjs && node scripts/build-web.mjs",
     "cap:sync": "npm run web && npx cap sync",
     "android": "npm run cap:sync && npx cap open android",
     "ios": "npm run cap:sync && npx cap open ios"

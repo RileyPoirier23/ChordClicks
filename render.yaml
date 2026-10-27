@@ -24,6 +24,10 @@ services:
         sync: false
       - key: ADMIN_TOKEN
         generateValue: true
+      - key: SQUARE_WEBHOOK_SIGNATURE_KEY   # Square → Developer → Webhooks → Signature key (optional, for automatic keys)
+        sync: false
+      - key: SQUARE_WEBHOOK_URL             # the exact webhook URL you typed into Square
+        sync: false
     disk:
       name: data
       mountPath: /var/data

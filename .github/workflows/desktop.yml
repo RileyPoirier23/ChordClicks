@@ -59,14 +59,15 @@ jobs:
           v="v$(node -p "require('./package.json').version")"
           echo "tag=$v" >> "$GITHUB_OUTPUT"
           if gh release view "$v" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then echo "needed=false" >> "$GITHUB_OUTPUT"; else echo "needed=true" >> "$GITHUB_OUTPUT"; fi
-      # release notes come from the commit message (the website's "What's new" reads them)
+      # release notes come from CHANGELOG.md (the website's changelog page and the app's What's new read the same file)
       - name: Release notes
         if: startsWith(github.ref, 'refs/tags/v') || steps.rel.outputs.needed == 'true'
         shell: bash
         env:
           MSG: ${{ github.event.head_commit.message }}
         run: |
-          printf '%s\n' "${MSG:-New build of ChordClicks.}" | grep -viE '^(co-authored-by|claude-session):' > release-notes.md || echo "New build of ChordClicks." > release-notes.md
+          # CHANGELOG.md section for this version; falls back to the commit message when there is none
+          if node scripts/changelog.mjs notes | grep -q '^## '; then node scripts/changelog.mjs notes > release-notes.md; else printf '%s\n' "${MSG:-New build of ChordClicks.}" | grep -viE '^(co-authored-by|claude-session):' > release-notes.md || echo "New build of ChordClicks." > release-notes.md; fi
       - name: Publish release
         if: startsWith(github.ref, 'refs/tags/v') || steps.rel.outputs.needed == 'true'
         uses: softprops/action-gh-release@v2
