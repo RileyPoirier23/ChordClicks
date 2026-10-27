@@ -17,7 +17,8 @@
   }
   const online = () => navigator.onLine !== false;
 
-  const proxyUrl = () => { try { return String(localStorage.getItem('rcc-proxy') || '').replace(/\/+$/, ''); } catch (e) { return ''; } };
+  /** Helper server: what the user typed in Settings, else the one the website publishes (so phones and the web app need no setup). */
+  const proxyUrl = () => { let u = ''; try { u = String(localStorage.getItem('rcc-proxy') || ''); } catch (e) {} if (!u && RCC.pro && RCC.pro.config) u = RCC.pro.config().helper || ''; return u.replace(/\/+$/, ''); };
   async function fetchHtml(url) {
     if (R && R.ug) { const r = await R.ug.fetch(url); if (!r || !r.ok) throw new Error(r && r.error || 'Could not reach Ultimate Guitar'); return r.html; }
     const px = proxyUrl();

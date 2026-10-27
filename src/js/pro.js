@@ -12,7 +12,7 @@
   async function syncConfig() {
     if (navigator.onLine === false) return;
     try { const j = await fetch(SITE + '/api/content', { cache: 'no-store', signal: AbortSignal.timeout(6000) }).then(r => r.json()); const c = (j && j.chordclicks) || {};
-      Object.assign(cfg, { proLive: !!c.proLive, buy: c.buy || cfg.buy, price: c.price || cfg.price, promo: c.promo || '' }); try { localStorage.setItem('rcc-procfg', JSON.stringify(cfg)); } catch (e) {} emit(); } catch (e) {}
+      Object.assign(cfg, { proLive: !!c.proLive, buy: c.buy || cfg.buy, price: c.price || cfg.price, promo: c.promo || '', helper: String(c.helper || '').replace(/\/+$/, '') }); try { localStorage.setItem('rcc-procfg', JSON.stringify(cfg)); } catch (e) {} emit(); } catch (e) {}
   }
   const FEATURES = [
     ['score', 'Play-along scoring', 'Score me and Wait-for-me in Solo: the app listens and grades every note.'],
