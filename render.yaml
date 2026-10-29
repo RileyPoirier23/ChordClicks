@@ -14,7 +14,7 @@ services:
       # Pro checkout (see docs/CHECKOUT.md). Fill these in the Render dashboard; sync: false keeps them out of the blueprint.
       - key: LICENCE_PRIVATE_JWK
         sync: false
-      - key: STRIPE_SECRET_KEY
+      - key: STRIPE_API_KEY               # restricted key (rk_…), Checkout Sessions: read
         sync: false
       - key: STRIPE_WEBHOOK_SECRET
         sync: false

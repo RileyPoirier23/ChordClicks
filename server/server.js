@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// Prefer a restricted key (rk_…, Checkout Sessions: read). STRIPE_SECRET_KEY still works for older deploys.
+const STRIPE_KEY = process.env.STRIPE_API_KEY || process.env.STRIPE_SECRET_KEY || '';
 /* Optional cloud-sync server for ChordClicks. Zero dependencies.
    Run:  node server/server.js            (PORT=8787, DATA_DIR=./server-data)
    Put it behind HTTPS (Caddy / nginx / a host like Fly.io or Render) before using it over the internet. */
@@ -19,7 +21,7 @@ async function signKey(payload) {
   return 'CCPRO-' + body + '.' + b64u(sig);
 }
 async function stripeGet(p) {
-  const r = await fetch('https://api.stripe.com/v1' + p, { headers: { authorization: 'Bearer ' + process.env.STRIPE_SECRET_KEY }, signal: AbortSignal.timeout(15000) });
+  const r = await fetch('https://api.stripe.com/v1' + p, { headers: { authorization: 'Bearer ' + STRIPE_KEY }, signal: AbortSignal.timeout(15000) });
   if (!r.ok) throw Object.assign(new Error('Stripe: ' + r.status), { code: 502 }); return r.json();
 }
 function stripeSigOk(raw, header) {
@@ -105,7 +107,7 @@ function createServer({ dataDir = path.join(__dirname, '..', 'server-data'), all
       if (req.method === 'GET' && url === '/api/key') {
         if (limited(ip, 20)) return out(res, 429, { ok: false, error: 'Too many requests. Wait a minute.' });
         const sid = new URL(req.url, 'http://x').searchParams.get('session_id') || ''; if (!/^cs_[A-Za-z0-9_]+$/.test(sid)) return out(res, 400, { ok: false, error: 'Bad session' });
-        if (!process.env.STRIPE_SECRET_KEY) return out(res, 500, { ok: false, error: 'Checkout is not configured on this server yet.' });
+        if (!STRIPE_KEY) return out(res, 500, { ok: false, error: 'Checkout is not configured on this server yet.' });
         const sess = await stripeGet('/checkout/sessions/' + encodeURIComponent(sid)); const o = await keyForSession(sess);
         return out(res, 200, { ok: true, key: o.key, email: o.email, mailed: o.mailed });
       }
@@ -118,7 +120,7 @@ function createServer({ dataDir = path.join(__dirname, '..', 'server-data'), all
         if (url === '/api/admin/export') return out(res, 200, { ok: true, at: Date.now(), orders: rd(ordersFile, {}), trials: rd(trialsFile, {}), users: Object.keys(rd(usersFile, {})) });
         if (url === '/api/admin/stats') {
           const orders = Object.entries(rd(ordersFile, {})).map(([id, o]) => ({ id: id.slice(-8), at: o.at, email: String(o.email || '').replace(/^(.).*(@.*)$/, '$1…$2'), name: o.name, mailed: o.mailed, manual: !!o.manual })).sort((a, b) => b.at - a.at);
-          return out(res, 200, { ok: true, orders: orders.slice(0, 50), count: orders.length, users: Object.keys(rd(usersFile, {})).length, trials: Object.keys(rd(trialsFile, {})).length, stripe: !!process.env.STRIPE_SECRET_KEY, square: !!process.env.SQUARE_WEBHOOK_SIGNATURE_KEY, mail: !!process.env.RESEND_API_KEY, signing: !!process.env.LICENCE_PRIVATE_JWK });
+          return out(res, 200, { ok: true, orders: orders.slice(0, 50), count: orders.length, users: Object.keys(rd(usersFile, {})).length, trials: Object.keys(rd(trialsFile, {})).length, stripe: !!STRIPE_KEY, square: !!process.env.SQUARE_WEBHOOK_SIGNATURE_KEY, mail: !!process.env.RESEND_API_KEY, signing: !!process.env.LICENCE_PRIVATE_JWK });
         }
         const { name = '', email = '' } = q || {}; const key = await signKey({ n: String(name).slice(0, 40), e: String(email).slice(0, 60), i: Date.now(), x: 0, v: 1 });
         const orders = rd(ordersFile, {}); const id = 'manual_' + Date.now(); orders[id] = { key, email, name, at: Date.now(), mailed: false, manual: true };
