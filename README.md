@@ -58,3 +58,9 @@ npm start
 npm run dist
 ```
 See [README_BUILD.md](README_BUILD.md) for the full build notes. Pushing a new `version` in `package.json` to `main` builds and publishes a release automatically.
+
+## Stripe invoicing (owner panel → Invoices)
+Set `STRIPE_API_KEY` (restricted key: Customers write, Invoices write, Tax settings read, Tax registrations read) and
+`STRIPE_WEBHOOK_SECRET` (endpoint `https://www.506clicks.ca/api/stripe/webhook`, events `invoice.paid`, `invoice.payment_failed`,
+`invoice.voided`, `invoice.marked_uncollectible`, `invoice.sent`). Optional `STRIPE_CURRENCY` (default `cad`).
+Full plan and setup: `docs/STRIPE.md`. There is no checkout on the site; ChordClicks Pro is sold through a Payment Link handled by the ChordClicks helper server.

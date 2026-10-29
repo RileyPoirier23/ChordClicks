@@ -10,7 +10,7 @@ Then in Render → the service → **Environment**, add:
 | Variable | Value |
 |---|---|
 | `LICENCE_PRIVATE_JWK` | the whole contents of your `licence-private.jwk` (one line) |
-| `STRIPE_SECRET_KEY` | from Stripe → Developers → API keys (`sk_live_…`; use `sk_test_…` while testing) |
+| `STRIPE_API_KEY` | a **restricted key**: Developers → API keys → Create restricted key, permission *Checkout Sessions: read* only (`rk_live_…`; an `rk_test_…` from a sandbox while testing). Never a full `sk_` key. |
 | `STRIPE_WEBHOOK_SECRET` | from step 3 (`whsec_…`) |
 | `RESEND_API_KEY` | optional, from https://resend.com (free 3k emails/month) so keys are emailed automatically |
 | `MAIL_FROM` | optional, e.g. `ChordClicks <keys@506clicks.ca>` (verify the domain in Resend) |
@@ -21,7 +21,7 @@ Check: `https://<your-server>/api/health` → `{"ok":true}`.
 
 ## 2. Stripe product + Payment Link
 1. https://dashboard.stripe.com → Products → **Add product**: "ChordClicks Pro", one-time, $24.99 (CAD or USD).
-2. Product → **Create payment link**. Under *After payment* choose **Don't show confirmation page** → redirect to
+2. Product → set the tax code to *Software as a service* (or *Downloadable software*). **Create payment link** with **Collect tax automatically** on. Under *After payment* choose **Don't show confirmation page** → redirect to
    `https://www.506clicks.ca/projects/chordclicks/thanks/?session_id={CHECKOUT_SESSION_ID}` (keep the placeholder exactly).
 3. Copy the link (`https://buy.stripe.com/…`).
 
@@ -39,6 +39,9 @@ events: `checkout.session.completed` and `checkout.session.async_payment_succeed
 Use `sk_test_…`, a test Payment Link and card `4242 4242 4242 4242`. After paying you should land on the thank-you page
 with a `CCPRO-…` key; `node scripts/licence.mjs verify <key>` prints VALID; the key unlocks Pro in the app.
 Switch the three Stripe values to live when happy.
+
+## Tax
+Stripe Tax only collects where you have an active registration: Dashboard → Tax → Settings (head office) then Tax → Locations → add your GST/HST number. Until then the link charges $24.99 with no tax and that is what the buyer pays. Whether you must register is a question for your accountant; the website's `docs/STRIPE.md` has the full tax setup.
 
 ## Manual sales (no Stripe)
 `node scripts/licence.mjs issue "Buyer Name" --email buyer@example.com` prints a key to send yourself.
