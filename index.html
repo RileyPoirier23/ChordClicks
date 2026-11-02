@@ -199,8 +199,9 @@
 
    <!-- ============ LEARN ============ -->
    <section class="view" id="v-learn">
-    <div class="seg wide" id="ln-tabs"><button data-t="chords" class="on">Chord library</button><button data-t="changes">Chord changes</button><button data-t="ear">Ear training</button><button data-t="finger">Fingerpicking</button><button data-t="paths">Paths</button><button data-t="theory">Theory</button><button data-t="progress">Progress</button></div>
+    <div class="seg wide" id="ln-tabs"><button data-t="chords" class="on">Chord library</button><button data-t="changes">Chord changes</button><button data-t="ear">Ear training</button><button data-t="finger">Fingerpicking</button><button data-t="paths">Paths</button><button data-t="write">Write</button><button data-t="theory">Theory</button><button data-t="progress">Progress</button></div>
     <div class="ln-pane" id="ln-paths"></div>
+    <div class="ln-pane" id="ln-write"></div>
     <div class="ln-pane on" id="ln-chords"></div>
     <div class="ln-pane" id="ln-changes"></div>
     <div class="ln-pane" id="ln-ear"></div>
@@ -242,7 +243,7 @@
      <select id="g-dev" class="grow"></select><button class="btn sm" id="g-ref" title="Refresh devices">↻</button>
      <label class="tg" title="Hear your processed guitar. Use headphones to avoid feedback."><span class="sw"><input type="checkbox" id="g-mon"><i></i></span>Monitor</label>
      <button class="chip" id="g-hp" title="Tick when you are wearing headphones">🎧 Headphones</button>
-     <div class="seg" id="g-tabs"><button class="on" data-t="rig">Pedals &amp; Amp</button><button data-t="loop">Looper</button><button data-t="rec">Record</button></div>
+     <div class="seg" id="g-tabs"><button class="on" data-t="rig">Pedals &amp; Amp</button><button data-t="loop">Looper</button><button data-t="slow">Slow-downer</button><button data-t="rec">Record</button></div>
     </div>
     <div class="gear-live card">
      <div class="meter"><i id="g-lvl"></i></div><b id="g-db">off</b>
@@ -263,6 +264,14 @@
        <div class="small">Tempo and beats come from the Practice metronome. Loops are captured on the audio thread, sample-accurate, after the pedals and amp — so overdubs keep your tone and the seam stays tight. Turn on <b>Monitor</b> (with headphones) to hear yourself while recording.</div>
        <div class="small" id="lp-diag"></div>
        <div id="lp-layers"></div></div></div></div>
+    <div class="g-pane" id="gp-slow"><div class="card sd">
+      <audio id="sd-audio" preload="auto"></audio>
+      <div class="row" style="margin:0;gap:8px;flex-wrap:wrap"><input type="file" id="sd-file" accept="audio/*,.mp3,.wav,.m4a,.ogg,.flac" hidden><button class="btn" id="sd-pick">Load a recording…</button><b id="sd-name" class="small" style="overflow-wrap:anywhere">No file yet</b><span class="grow"></span><span class="small" id="sd-time">0:00.0 / 0:00.0</span></div>
+      <canvas id="sd-wave" title="Click to seek"></canvas>
+      <div class="row" style="gap:8px;flex-wrap:wrap"><button class="btn p big" id="sd-play">▶ Play</button><button class="btn" id="sd-back" title="Back 5 s">−5 s</button><button class="btn" id="sd-fwd" title="Forward 5 s">+5 s</button><span class="grow"></span><button class="btn sm" id="sd-a" title="Set loop start here ([)">A 0:00.0</button><button class="btn sm" id="sd-b" title="Set loop end here (])">B 0:00.0</button><button class="btn sm" id="sd-loop" title="Loop A to B (l)">Loop</button><button class="btn sm ghost" id="sd-clear">Clear</button></div>
+      <div class="row" style="gap:10px;flex-wrap:wrap"><label class="l">Speed</label><input type="range" id="sd-speed" min="40" max="125" step="5" value="100" class="grow"><b id="sd-speed-v" style="min-width:48px">100%</b><span class="seg sm"><button data-sd="50">50%</button><button data-sd="70">70%</button><button data-sd="85">85%</button><button data-sd="100">100%</button></span></div>
+      <div class="row" style="gap:12px;flex-wrap:wrap"><label class="tg" title="Count in at the Practice tempo before it starts"><span class="sw"><input type="checkbox" id="sd-count"><i></i></span>Count me in</label><button class="btn sm" id="sd-chords">Chords from this recording</button><span class="small">Pitch stays the same at any speed. Keys: [ and ] set A/B, l loops, , and . change speed.</span></div>
+      <div class="small" id="sd-msg"></div></div></div>
     <div class="g-pane" id="gp-rec"><div class="card pad">
       <div class="row"><button class="btn p big" id="rc-btn">● Start recording</button><b id="rc-time" style="font-variant-numeric:tabular-nums;font-size:20px">0:00</b></div>
       <div class="row"><label class="tg"><span class="sw"><input type="checkbox" id="rc-vid" checked><i></i></span>Camera + overlay video</label>
@@ -422,6 +431,8 @@
 <script src="src/js/stage.js"></script>
 <script src="src/js/transcribe.js"></script>
 <script src="src/js/whatsnew.js"></script>
+<script src="src/js/slowdown.js"></script>
+<script src="src/js/write.js"></script>
 <script src="src/js/scales.js"></script>
 <script src="src/js/app.js"></script>
 </body></html>

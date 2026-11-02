@@ -23,6 +23,8 @@
     ['library', 'Unlimited library', `Save more than ${FREE_SONGS} songs, with set lists, gig notes and PDF export.`],
     ['finger', 'All fingerpicking patterns', 'Every pattern in the Fingerpicking room, not just the first three.'],
     ['sync', 'Cloud sync', 'Keep songs, playlists and progress in step across computers and phones.'],
+    ['slow', 'Slow-downer', 'Load any recording, slow it to half speed at the same pitch, loop the lick between A and B, count it in.'],
+    ['write', 'Songwriter', 'Build progressions in any key from the chords that fit, hear them with the band, save or export the backing.'],
   ];
   const esc = v => String(v == null ? '' : v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const FEATURE_OF = Object.fromEntries(FEATURES.map(f => [f[0], f]));
