@@ -24,7 +24,7 @@
     return `<div style="font-family:Segoe UI,system-ui,Arial;color:#121212;background:#f3f0e8;padding:20px;max-width:560px;border:1px solid #121212">
       <div style="font:800 24px/1.1 Arial;letter-spacing:-.02em">Your ChordClicks week${name ? ', ' + esc(name) : ''}</div>
       <div style="font:13px monospace;color:#555;margin:4px 0 14px">${new Date().toLocaleDateString()}</div>
-      <table style="border-collapse:collapse;width:100%"><tr><td style="padding:0 10px 0 0;border:1px solid #121212;padding:8px"><div style="font:800 26px Arial">${fmtMin(r.week.sec)}</div><div style="font:12px monospace">practised${r.delta != null ? ` · ${r.delta >= 0 ? '+' : ''}${r.delta}% vs last week` : ''}</div></td>
+      <table style="border-collapse:collapse;width:100%"><tr><td style="padding:0 10px 0 0;border:1px solid #121212;padding:8px"><div style="font:800 26px Arial">${fmtMin(r.week.sec)}</div><div style="font:12px monospace">practiced${r.delta != null ? ` · ${r.delta >= 0 ? '+' : ''}${r.delta}% vs last week` : ''}</div></td>
       <td style="border:1px solid #121212;padding:8px"><div style="font:800 26px Arial">${r.week.active}/7</div><div style="font:12px monospace">days played</div></td>
       <td style="border:1px solid #121212;padding:8px"><div style="font:800 26px Arial">${r.week.songs}</div><div style="font:12px monospace">songs</div></td></tr></table>
       <table style="margin:14px 0 6px;width:100%"><tr>${bars}</tr></table>
