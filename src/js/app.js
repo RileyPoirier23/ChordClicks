@@ -319,7 +319,7 @@
     const o = $('pro-off'); if (o) o.onclick = async () => { if (await askConfirm('Remove the Pro key from this device?', 'Remove')) RCC.pro.deactivate(); };
     // PRO tags on gated controls
     const mark = (sel, f) => document.querySelectorAll(sel).forEach(el => RCC.pro.mark(el, f));
-    mark('#solo-mode [data-v=score], #solo-mode [data-v=wait]', 'score'); mark('#lp-rec', 'looper'); mark('#vcam', 'stream'); mark('#lib-pdf, #lib-notes, #stageb', 'library'); mark('#planb, #bwav, #ug-audio', 'trainer');
+    mark('#solo-mode [data-v=score], #solo-mode [data-v=wait]', 'score'); mark('#lp-rec', 'looper'); mark('#vcam', 'stream'); mark('#lib-pdf, #lib-notes, #stageb', 'library'); mark('#planb, #bwav, #ug-audio', 'trainer'); mark('#sd-play', 'slow'); mark('#ln-tabs [data-t=write]', 'write');
     document.querySelectorAll('#ramp, #listen').forEach(i => RCC.pro.mark(i.closest('label'), 'trainer'));
     document.querySelectorAll('#ln-tabs [data-t=changes]').forEach(el => RCC.pro.mark(el, 'trainer'));
     document.querySelectorAll('#sc-tabs button:not([data-t=scales])').forEach(el => RCC.pro.mark(el, 'neck'));
@@ -597,6 +597,8 @@
     $('ramp').checked = TR.ramp; $('rampset').style.display = TR.ramp ? '' : 'none'; $('rampstart').value = TR.rampStart; $('rampstart-v').textContent = TR.rampStart + '%'; if (TR.ramp) TR.speed = TR.rampStart; $('accpat').value = TR.acc; $('flash').checked = TR.flash; $('silent').checked = TR.silent; $('sil-play').value = TR.silPlay; $('sil-mute').value = TR.silMute; $('backing').checked = TR.backing; $('bstyle').value = TR.bstyle; $('bvol').value = TR.bvol; $('bcomp').checked = TR.bcomp; paintSpeed();
     RCC.solo.init({ track: o => Store.track(o), songTitle: () => (song && song.title) || '', result: r => Store.track({ drill: 'solo-' + r.mode, score: { key: r.key, v: Math.round(r.acc) } }), audio, bpm: { get: () => P.bpm, set: setBpm }, toast, accent: () => P.accent, click: acc => clickAt(audio().currentTime + .01, acc, false), saveTab: t => { if (song) { song.soloTab = t; if (song.id) Store.updateSong(song.id, { soloTab: t }); RCC.solo.setSong(song); toast('Tab saved to this song'); } } });
     RCC.tuner.init({ audio, toast });
+    RCC.write.init({ toast, jam: (text, title, o) => { loadSong(tempSong(title, text, { artist: 'Songwriter', bpm: o && o.bpm || 0 })); if (o && o.bpm) setBpm(o.bpm); if (o && o.style) { TR.bstyle = o.style; $('bstyle').value = o.style; } TR.backing = true; $('backing').checked = true; saveTR(); show('practice'); } });
+    RCC.slowdown.init({ toast, bpm: () => P.bpm, beats: () => +$('beats').value });
     RCC.learn.init({ toast, audio, accent: () => P.accent, jam: (text, title) => { loadSong(tempSong(title, text, { artist: 'Theory lesson' })); show('practice'); }, useChord: n => { loadSong(tempSong(n, '[Chord]\n' + n, { artist: 'Chord library' })); show('practice'); }, track: o => Store.track(o), bpm: () => P.bpm, drill: (text, name) => { if (RCC.solo.openTab(text, name)) show('solo'); } });
     RCC.gear.init({ toast, bpm: () => P.bpm, beats: () => +$('beats').value });
     if (RCC.record) RCC.record.init({ toast, setOutputSize, flipCam, camLive, startCam, setMode, modes: OV.MODES, P, saveP, running: () => running, toggle, songTitle: () => (song && song.title) || '', out: cv, renderStreamUI });

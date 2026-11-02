@@ -2,6 +2,11 @@
 
 The newest version is at the top. Each release's section becomes the GitHub release notes and the "What's new" dialog in the app.
 
+## 3.5.0 — 2026-11-02
+- **Slow-downer** in Gear: load any recording, slow it to half speed at the same pitch, loop a lick between A and B, count it in from the Practice tempo, and hand the file to Chords from a recording. (Pro)
+- **Songwriter** in Learn → Write: pick a key, tap the chords that fit (the likely next ones glow), start from ten classic shapes, build verse/chorus/bridge, hear it with the backing band, open in Practice, save, or export a backing WAV. Capo hints when the shapes are hard. (play / save / export are Pro)
+- Two new Pro features show in the trial and upsell lists.
+
 ## 3.4.0 — 2026-10-27
 - **Practice plan**: the Plan button builds a short routine for the loaded song — tune up, learn the chords you haven't marked known, drill the hardest change, loop the busiest section at 70% with the tempo ramp, then play it through. (Pro)
 - **Lesson paths** in Learn: "Your first 10 songs" (free), Barre chords, Fingerstyle foundations, Lead guitar, Theory you actually use. Ticks come from what you do in the app.
