@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 const root = fileURLToPath(new URL('..', import.meta.url));
 export function parse(md) {
   const out = []; let cur = null;
-  for (const line of md.split('\n')) {
+  for (const line of md.split(/\r?\n/)) {
     const h = /^## (\d+\.\d+\.\d+)\s*(?:—|-)\s*(\d{4}-\d{2}-\d{2})?/.exec(line);
     if (h) { cur = { version: h[1], date: h[2] || '', items: [] }; out.push(cur); continue; }
     const li = /^- (.*)$/.exec(line); if (li && cur) cur.items.push(li[1].trim());
