@@ -5,7 +5,7 @@
   const T = RCC.theory, $ = id => document.getElementById(id);
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const fmt = n => n >= 60 ? Math.round(n / 60) + ' min' : n + ' s';
-  /** Pure: what to practise for a song. */
+  /** Pure: what to practice for a song. */
   function build(song, prog, { knows = () => false, changes = {} } = {}) {
     const names = prog.map(p => p.c), uniq = [...new Set(names.map(T.canon))];
     const unknown = uniq.filter(c => !knows(c)).sort((a, b) => T.chordDifficulty(b) - T.chordDifficulty(a));

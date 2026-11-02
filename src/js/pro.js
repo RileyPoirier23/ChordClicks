@@ -63,7 +63,7 @@
     a.dialog(`<div class="pro-splash"><span class="pro-tag big">PRO</span><h2>${h}</h2><p>${p}</p>
       <ul class="pro-list compact">${FEATURES.map(x => `<li class="${x[0] === f ? 'hl' : ''}"><b>${a.esc(x[1])}</b></li>`).join('')}</ul>
       <div class="row" style="justify-content:space-between;margin-top:12px;gap:8px"><div class="row" style="margin:0;gap:8px">${trialUsed() ? '' : `<button class="btn p" id="sp-trial">Try Pro free for ${TRIAL_DAYS} days</button>`}${live() ? `<a class="btn ${trialUsed() ? 'p' : ''}" href="${a.esc(cfg.buy)}" target="_blank" rel="noreferrer">Buy Pro · ${a.esc(cfg.price)} once</a>` : ''}</div><button class="btn ghost" id="sp-x">Not now</button></div>
-      <div class="small" style="margin-top:8px">${live() ? 'No subscription. Works offline on all your devices.' : 'Keys go on sale soon. Everything stays free to practise with.'}</div></div>`, () => {
+      <div class="small" style="margin-top:8px">${live() ? 'No subscription. Works offline on all your devices.' : 'Keys go on sale soon. Everything stays free to practice with.'}</div></div>`, () => {
       document.getElementById('sp-x').onclick = a.closeDlg; const t = document.getElementById('sp-trial'); if (t) t.onclick = () => trialDialog();
     });
     return true;
