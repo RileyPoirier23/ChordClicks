@@ -2,6 +2,11 @@
 
 The newest version is at the top. Each release's section becomes the GitHub release notes and the "What's new" dialog in the app.
 
+## 3.6.1 — 2026-11-08
+- Practice is tidier: the sheet header is two clean rows, the trainer and backing cards fold away (closed by default on phones), the chord diagram is bigger.
+- Phones: one-row header with a Find button instead of a second search bar; six tuner pegs fit in one row; the active overlay chip is readable again.
+- Record: the controls sit under the picture instead of on top of the chord overlay.
+
 ## 3.6.0 — 2026-11-08
 - **Menus instead of a scroll**: four groups (Play, Learn, Studio, More). Labelled sections on desktop; a four-tab bar with a slide-up menu on phones.
 - **Accounts on phones and the web** work now: sign in or register on the device, keep a library per account, and cloud sync through the helper server.

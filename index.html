@@ -43,7 +43,7 @@
    <label class="search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
     <input id="q" list="sugg" autocomplete="off" placeholder="Search Ultimate Guitar or your library"><datalist id="sugg"></datalist>
     <button class="btn p sm" id="ug">Search</button></label>
-   <button class="btn" id="recb" title="Record camera + overlay + audio">● Rec</button><button class="btn" id="pipb" title="Floating preview window">Float</button>
+   <button class="btn" id="findb" title="Find a song">⌕ Find</button><button class="btn" id="recb" title="Record camera + overlay + audio">● Rec</button><button class="btn" id="pipb" title="Floating preview window">Float</button>
    <button class="btn" id="cleanb" title="Fullscreen output only (Esc to exit)">Clean</button>
    <span id="netpill" class="pill off" hidden>Offline · saved songs only</span><span id="vstat" class="pill">Virtual cam off</span>
   </header>
@@ -71,9 +71,9 @@
     </div>
     <div class="col-side">
      <div class="card sheetcard">
-      <div class="sh-head"><b id="sh-title">Chord sheet</b>
-       <label class="tg" title="Keep the current chord in view"><span class="sw"><input type="checkbox" id="follow" checked><i></i></span>Follow</label>
-       <button class="btn sm" id="xpose" title="Transpose, capo helper, key">Key / Capo</button><button class="btn sm" id="planb" title="A short routine built for this song">Plan</button><button class="btn sm" id="stageb" title="Full-screen sheet with pedal page turns">Stage</button><button class="btn sm" id="editb">Edit</button></div>
+      <div class="sh-head"><div class="sh-row"><b id="sh-title">Chord sheet</b><button class="btn sm" id="editb">Edit</button></div>
+       <div class="sh-tools"><label class="tg" title="Keep the current chord in view"><span class="sw"><input type="checkbox" id="follow" checked><i></i></span>Follow</label>
+       <button class="btn sm" id="xpose" title="Transpose, capo helper, key">Key / Capo</button><button class="btn sm" id="planb" title="A short routine built for this song">Plan</button><button class="btn sm" id="stageb" title="Full-screen sheet with pedal page turns">Stage</button></div></div>
       <div id="secs"></div>
       <div id="sheet">Paste a chord sheet with Edit, or import one from Ultimate Guitar in Find.</div>
       <div id="pastewrap" style="display:none;flex:1;flex-direction:column;min-height:0"><textarea id="paste" spellcheck="false" placeholder="Paste chords or tab text (also works with [ch]Am[/ch])"></textarea>
@@ -86,22 +86,22 @@
        <label class="l" style="min-width:0">Subdivide</label><select id="sub"><option value="1">Quarter</option><option value="2" selected>8ths</option><option value="3">Triplets</option><option value="4">16ths</option></select></div>
       <div class="row"><label class="l">Volume</label><input type="range" id="vol" min="0" max="1" step=".05" value=".7"><label class="tg"><span class="sw"><input type="checkbox" id="autoc" checked><i></i></span>Auto chord</label></div>
      </div>
-     <div class="card trainer">
-      <h4>Loop &amp; slow-down trainer</h4>
+     <details class="card trainer" open>
+      <summary><h4>Loop &amp; slow-down trainer</h4></summary>
       <div class="row"><label class="l">Loop</label><select id="loopsel" class="grow"></select></div>
       <div class="row" id="looprange" style="display:none"><label class="l">Chords</label><input type="number" id="loopfrom" min="1" value="1" style="width:64px"><span class="small">to</span><input type="number" id="loopto" min="1" value="4" style="width:64px"><span class="small">(chord numbers in the sheet)</span></div>
       <div class="row"><label class="tg" title="Start slower and speed up by 5% after each clean pass of the loop"><span class="sw"><input type="checkbox" id="ramp"><i></i></span>Ramp tempo up as I succeed</label></div>
       <div class="row" id="rampset" style="display:none"><label class="l">Start at</label><input type="range" id="rampstart" min="40" max="95" step="5" value="60" style="min-width:60px"><b id="rampstart-v" style="min-width:42px">60%</b></div>
       <div class="row"><label class="tg" title="Listens to your guitar and checks each chord. Needs a mic or interface."><span class="sw"><input type="checkbox" id="listen"><i></i></span>Listen to me &amp; check chords</label><span class="small" id="fbtxt"></span></div>
       <div class="row small" id="speedrow" style="display:none">Tempo now <b id="speedv" style="color:var(--fg)">100%</b> · pass <b id="passv" style="color:var(--fg)">0</b></div>
-     </div>
-     <div class="card tools">
-      <h4>Timing &amp; backing</h4>
+     </details>
+     <details class="card tools" open>
+      <summary><h4>Timing &amp; backing</h4></summary>
       <div class="row"><label class="l">Accents</label><select id="accpat" class="grow"><option value="Xxxx">Beat 1 accented</option><option value="XxXx">1 &amp; 3 strong</option><option value="xXxX">Backbeat (2 &amp; 4)</option><option value="XXXX">Every beat strong</option><option value="X...">Click only on 1</option><option value="xxxx">No accent</option></select><label class="tg"><span class="sw"><input type="checkbox" id="flash" checked><i></i></span>Flash</label></div>
       <div class="row"><label class="tg" title="Mutes the click for some bars so you have to keep time yourself"><span class="sw"><input type="checkbox" id="silent"><i></i></span>Silent bars</label><span class="small">play</span><input type="number" id="sil-play" min="1" max="16" value="3" style="width:54px"><span class="small">mute</span><input type="number" id="sil-mute" min="1" max="8" value="1" style="width:54px"></div>
       <div class="row"><label class="tg"><span class="sw"><input type="checkbox" id="backing"><i></i></span>Backing track</label><select id="bstyle" class="grow"></select></div>
       <div class="row"><label class="l">Volume</label><input type="range" id="bvol" min="0" max="1" step=".05" value=".6"><label class="tg" title="Plays the strumming pattern too, so you can solo or sing over it"><span class="sw"><input type="checkbox" id="bcomp"><i></i></span>Strum for me</label><button class="btn sm" id="bwav" title="Render the backing track for this song to a WAV file">Export WAV</button></div>
-     </div>
+     </details>
     </div>
    </section>
 
