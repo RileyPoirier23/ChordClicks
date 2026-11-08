@@ -2,7 +2,7 @@
    in a plain browser it falls back to localStorage (no accounts). */
 (function () {
   const RCC = (window.RCC = window.RCC || {});
-  const B = window.rcc;                    // preload bridge (Electron only)
+  const B = window.rcc || RCC.webBridge;   // preload bridge (Electron) or the web/phone stand-in (bridge-web.js)
   const GENRE_COLORS = { rock: '#f43f5e', pop: '#ec4899', country: '#f59e0b', blues: '#3b82f6', metal: '#94a3b8', folk: '#84cc16', punk: '#ef4444', indie: '#14b8a6', jazz: '#a855f7', worship: '#fbbf24', classic: '#fb923c', other: '#8b5cf6' };
   const PRESET_GENRES = ['Rock', 'Pop', 'Country', 'Blues', 'Metal', 'Folk', 'Punk', 'Indie', 'Jazz', 'Worship', 'Classic', 'Other'];
   const PL_COLORS = ['#8b5cf6', '#ec4899', '#38bdf8', '#34d399', '#fbbf24', '#fb923c', '#f87171', '#a3e635'];
@@ -122,7 +122,7 @@
 
     /* ---- cloud sync (optional) ---- */
     async syncNow() {
-      if (!B || !B.sync) return { ok: false, error: 'Sync is available in the desktop app.' };
+      if (!B || !B.sync) return { ok: false, error: 'Sync is not available here.' };
       this.flush(); const r = await B.sync.run(this.lib); if (!r || !r.ok) return r || { ok: false };
       this.lib = RCC.sync.mergeLibs(this.lib, r.lib); this.lib.v = 2; this.flush(); this.emit(); return { ok: true, at: r.at };
     },
@@ -131,7 +131,7 @@
     async register(a) { return this._auth(() => B.auth.register(a)); },
     async login(a) { return this._auth(() => B.auth.login(a)); },
     async _auth(fn) {
-      if (!B) return { ok: false, error: 'Accounts are available in the desktop app.' };
+      if (!B) return { ok: false, error: 'Accounts are not available here.' };
       this.flush(); const r = await fn();
       if (r.ok) { this.user = r.user; await this._load(); }
       return r;

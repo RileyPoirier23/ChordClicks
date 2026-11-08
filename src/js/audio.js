@@ -42,16 +42,32 @@
     o.frequency.value = acc ? 1500 : sub ? 700 : 1000; g.gain.setValueAtTime(Math.max(.0001, vol * (sub ? .4 : 1)), t); g.gain.exponentialRampToValueAtTime(.001, t + .05);
     o.connect(g).connect(A.clickBus); o.start(t); o.stop(t + .06);
   };
+  /* Plucked string (Karplus–Strong): a noise burst through a tuned feedback delay with a gentle low-pass, rendered once per
+     note into a buffer and cached, so chords sound like a guitar instead of organ tones. */
+  const ksCache = new Map();
+  function ksBuffer(c, midi) {
+    const key = c.sampleRate + ':' + midi; let b = ksCache.get(key); if (b) return b;
+    const sr = c.sampleRate, f = mtof(midi), N = Math.max(2, Math.round(sr / f)), len = Math.round(sr * 2.4), d = new Float32Array(len), ring = new Float32Array(N);
+    // excitation: short bright noise burst (pick) shaped by a quick decay, then a tiny lowpass so high strings aren't harsh
+    for (let i = 0; i < N; i++) ring[i] = (Math.random() * 2 - 1) * (1 - i / N * .3);
+    let prev = 0; for (let i = 0; i < N; i++) { const v = ring[i] * .5 + prev * .5; prev = v; ring[i] = v; }
+    const damp = Math.min(.9985, .994 + (midi - 40) * .00012), blend = .5; let p = 0, last = 0;
+    for (let i = 0; i < len; i++) { const cur = ring[p]; const nxt = ring[(p + 1) % N]; const v = damp * (cur * blend + nxt * (1 - blend)) * .5 + damp * last * .5; d[i] = cur; ring[p] = v; last = cur; p = (p + 1) % N; }
+    // body resonance: a soft second-order emphasis around 110–220 Hz mixed in lightly
+    let y1 = 0, y2 = 0; const w0 = 2 * Math.PI * 180 / sr, r = .985, a1 = -2 * r * Math.cos(w0), a2 = r * r;
+    for (let i = 0; i < len; i++) { const y = d[i] - a1 * y1 - a2 * y2; y2 = y1; y1 = y; d[i] = d[i] * .9 + y * .003; }
+    b = c.createBuffer(1, len, sr); b.copyToChannel(d, 0); ksCache.set(key, b); return b;
+  }
   A.pluck = (midi, t, dur = .5, vol = .4, dest) => {
-    const c = A.get(), o = c.createOscillator(), o2 = c.createOscillator(), g = c.createGain(), lp = c.createBiquadFilter(), f = mtof(midi);
-    o.type = 'triangle'; o2.type = 'sine'; o.frequency.value = f; o2.frequency.value = f * 2; lp.type = 'lowpass'; lp.frequency.setValueAtTime(3400, t); lp.frequency.exponentialRampToValueAtTime(500, t + dur);
-    g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + .008); g.gain.exponentialRampToValueAtTime(.0001, t + dur + .15);
-    o.connect(lp); o2.connect(lp); lp.connect(g).connect(dest || A.master); o.start(t); o2.start(t); o.stop(t + dur + .2); o2.stop(t + dur + .2);
+    const c = A.get(), src = c.createBufferSource(), g = c.createGain(), lp = c.createBiquadFilter();
+    src.buffer = ksBuffer(c, midi); lp.type = 'lowpass'; lp.frequency.setValueAtTime(5200, t); lp.frequency.exponentialRampToValueAtTime(1800, t + Math.max(.3, dur));
+    g.gain.setValueAtTime(vol * 1.6, t); g.gain.setValueAtTime(vol * 1.6, t + Math.max(.05, dur * .8)); g.gain.exponentialRampToValueAtTime(.0005, t + dur + .35);
+    src.connect(lp).connect(g).connect(dest || A.master); src.start(t); src.stop(t + dur + .4);
   };
   /** Strum a list of MIDI notes (low -> high). dir 'D' = low to high. */
   A.strum = (midis, t, dir = 'D', dur = 1.1, vol = .26) => {
-    const list = dir === 'U' ? midis.slice().reverse() : midis;
-    list.forEach((m, i) => A.pluck(m, t + i * .022, dur, vol));
+    const list = dir === 'U' ? midis.slice().reverse() : midis, gap = dir === 'U' ? .016 : .024; // a down-strum is a little slower than an up-strum
+    list.forEach((m, i) => A.pluck(m, t + i * gap * (1 + Math.random() * .25), dur * (1 - i * .02), vol * (dir === 'U' ? .85 : 1) * (1 - i * .04)));
   };
   A.chordMidis = (frets, tuning = [40, 45, 50, 55, 59, 64]) => frets.map((f, i) => (f < 0 ? null : tuning[i] + f)).filter(m => m != null);
   A.kick = (t, vol = .9) => { const c = A.get(), o = c.createOscillator(), g = c.createGain(); o.frequency.setValueAtTime(150, t); o.frequency.exponentialRampToValueAtTime(42, t + .12); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.001, t + .28); o.connect(g).connect(A.master); o.start(t); o.stop(t + .3); };

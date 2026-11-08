@@ -1,7 +1,7 @@
 {
   "name": "chordclicks",
   "productName": "ChordClicks",
-  "version": "3.5.0",
+  "version": "3.6.0",
   "description": "Practice songs, scales and solos with chords burned into your camera feed.",
   "author": {
     "name": "Riley Mackay-Poirier",
@@ -24,6 +24,7 @@
   },
   "devDependencies": {
     "@capacitor/android": "^7.4.3",
+    "@capacitor/app": "^7.1.2",
     "@capacitor/cli": "^7.4.3",
     "@capacitor/core": "^7.4.3",
     "@capacitor/ios": "^7.4.3",
@@ -33,7 +34,7 @@
   "build": {
     "appId": "ca.506clicks.chordclicks",
     "productName": "ChordClicks",
-    "copyright": "Copyright \u00a9 2026 Riley Mackay-Poirier (506Clicks)",
+    "copyright": "Copyright © 2026 Riley Mackay-Poirier (506Clicks)",
     "directories": {
       "buildResources": "build",
       "output": "dist"

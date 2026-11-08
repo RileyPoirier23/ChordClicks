@@ -27,8 +27,24 @@
       if (!r || !r.ok) throw new Error((r && r.error) || 'the helper server didn’t answer (Settings → Helper server)'); return r.html;
     }
     const native = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
-    try { const r = await fetch(url, { credentials: 'omit', headers: { accept: 'text/html' } }); if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); }
-    catch (e) { if (native) throw e; throw new Error('this build needs a helper server for Ultimate Guitar (Settings → Helper server), or use “Paste instead…”'); }
+    try { const r = await fetch(url, { credentials: 'omit', headers: { accept: 'text/html', 'accept-language': 'en' } }); if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); }
+    catch (e) { if (native) throw new Error('Ultimate Guitar refused the request from the phone and no helper server is set (Settings → Helper server)'); throw new Error('this build needs a helper server for Ultimate Guitar (Settings → Helper server), or use “Paste instead…”'); }
+  }
+  /** Phones: fetch natively first (CapacitorHttp, no CORS); if UG refuses, fall back to the helper server. */
+  async function fetchHtmlAny(url) {
+    const native = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()), px = proxyUrl();
+    if (native && px) { try { const r = await fetch(url, { credentials: 'omit', headers: { accept: 'text/html' } }); if (r.ok) { const h = await r.text(); if (storeFromHtml(h)) return h; } } catch (e) {} }
+    return fetchHtml(url);
+  }
+  /** A Spotify / Apple Music / YouTube link → { title, artist } via the helper (which reads the page's og: tags). Spotify also has a public oEmbed we can try directly. */
+  const LINK_RE = /https?:\/\/(open\.spotify\.com|music\.apple\.com|geo\.music\.apple\.com|www\.youtube\.com|youtu\.be|music\.youtube\.com|song\.link|album\.link)\/\S+/i;
+  function isLink(q) { return LINK_RE.test(String(q || '')); }
+  async function resolveLink(q) {
+    const url = (LINK_RE.exec(q) || [])[0]; if (!url) return null; const px = proxyUrl();
+    if (px) { try { const r = await fetch(px + '/api/resolve?url=' + encodeURIComponent(url), { signal: AbortSignal.timeout(15000) }).then(x => x.json()); if (r && r.ok && r.title) return { title: r.title, artist: r.artist || '', query: [r.title, r.artist].filter(Boolean).join(' ') }; } catch (e) {} }
+    if (/open\.spotify\.com/.test(url)) { try { const r = await fetch('https://open.spotify.com/oembed?url=' + encodeURIComponent(url), { signal: AbortSignal.timeout(10000) }).then(x => x.json()); if (r && r.title) return { title: r.title, artist: '', query: r.title }; } catch (e) {} }
+    if (/music\.apple\.com/.test(url)) { const m = /\/(?:song|album)\/([^/]+)\//.exec(url); if (m) { const t = decodeURIComponent(m[1]).replace(/-/g, ' '); return { title: t, artist: '', query: t }; } }
+    return null;
   }
   /** Fallback: let the hidden webview render the page (handles bot checks) and read the same store. */
   function viaWebview(url) {
@@ -48,7 +64,7 @@
   async function getStore(url) {
     if (!online()) throw new Error('offline');
     let store = null, err = null;
-    try { store = storeFromHtml(await fetchHtml(url)); } catch (e) { err = e; }
+    try { store = storeFromHtml(await fetchHtmlAny(url)); } catch (e) { err = e; }
     if (!store) { try { store = await viaWebview(url); } catch (e) { err = err || e; } }
     if (!store) throw err || new Error('Could not read that page');
     return store;
@@ -57,7 +73,8 @@
 
   /** @returns {Promise<{results:Array, more:boolean}>} */
   async function search(q, { type = 'chords', page: pg = 1 } = {}) {
-    const url = `${BASE}/search.php?search_type=title&value=${encodeURIComponent(q)}${pg > 1 ? '&page=' + pg : ''}`;
+    const solo = type === 'solo', qq = solo && !/\bsolo\b/i.test(q) ? q + ' solo' : q;
+    const url = `${BASE}/search.php?search_type=title&value=${encodeURIComponent(qq)}${pg > 1 ? '&page=' + pg : ''}`;
     const d = page(await getStore(url)) || {};
     let list = d.results || (d.data && d.data.tabs) || [];
     if (!Array.isArray(list)) list = [];
@@ -65,6 +82,7 @@
       id: r.id, title: r.song_name || '', artist: r.artist_name || '', type: KEEP[r.type], version: +r.version || 1, rating: +r.rating || 0, votes: +r.votes || 0,
       key: r.tonality_name || '', difficulty: r.difficulty || '', url: r.tab_url, capo: r.capo != null ? r.capo : '',
     })).filter(r => type === 'all' || (type === 'chords' ? r.type === 'Chords' : r.type === 'Tab'));
+    if (solo) out.sort((a, b) => (/\bsolo\b/i.test(b.title) - /\bsolo\b/i.test(a.title)) || b.rating * Math.log10(b.votes + 10) - a.rating * Math.log10(a.votes + 10));
     const pages = d.pagination && d.pagination.total;
     return { results: out, more: pages ? pg < pages : out.length >= 20 };
   }
@@ -92,5 +110,5 @@
     return { title: t.song_name || '', artist: t.artist_name || '', text, strums, meta, bpm, chords: [...new Set(chords)], url, rating: +t.rating || 0, votes: +t.votes || 0, version: +t.version || 1 };
   }
 
-  RCC.ug = { search, tab, storeFromHtml, online, BASE };
+  RCC.ug = { search, tab, storeFromHtml, online, BASE, isLink, resolveLink };
 })();

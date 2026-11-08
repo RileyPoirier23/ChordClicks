@@ -127,6 +127,22 @@ function createServer({ dataDir = path.join(__dirname, '..', 'server-data'), all
         try { orders[id].mailed = email ? await sendKeyMail(email, name, key) : false; } catch (e) {} wr(ordersFile, orders);
         return out(res, 200, { ok: true, key, mailed: orders[id].mailed });
       }
+      // A Spotify / Apple Music / YouTube link → song title + artist from the page's og: tags (so the app can search Ultimate Guitar)
+      if (req.method === 'GET' && url === '/api/resolve') {
+        if (limited('rs:' + ip, 30)) return out(res, 429, { ok: false, error: 'Too many requests' });
+        const target = new URL(req.url, 'http://x').searchParams.get('url') || ''; let u; try { u = new URL(target); } catch (e) { return out(res, 400, { ok: false, error: 'Bad link' }); }
+        if (!/^(open\.spotify\.com|music\.apple\.com|geo\.music\.apple\.com|www\.youtube\.com|youtu\.be|music\.youtube\.com|song\.link|album\.link)$/.test(u.hostname)) return out(res, 400, { ok: false, error: 'Only Spotify, Apple Music and YouTube links' });
+        try {
+          const html = await (await fetch(u.href, { headers: { 'user-agent': 'Mozilla/5.0 (compatible; ChordClicks/1.0)', accept: 'text/html', 'accept-language': 'en' }, redirect: 'follow', signal: AbortSignal.timeout(12000) })).text();
+          const og = n => { const m = new RegExp(`<meta[^>]+(?:property|name)=["']${n}["'][^>]+content=["']([^"']*)["']`, 'i').exec(html) || new RegExp(`<meta[^>]+content=["']([^"']*)["'][^>]+(?:property|name)=["']${n}["']`, 'i').exec(html); return m ? m[1].replace(/&amp;/g, '&').replace(/&#39;|&#x27;/g, "'").replace(/&quot;/g, '"').trim() : ''; };
+          let title = og('og:title') || (/<title>([^<]*)<\/title>/i.exec(html) || [])[1] || '', artist = '', desc = og('og:description');
+          if (/spotify/.test(u.hostname)) { artist = (desc.split(' · ')[0] || '').trim(); if (/^(Song|Single|Album)$/i.test(artist)) artist = ''; }
+          else if (/apple\.com/.test(u.hostname)) { const m = /^(.*?)\s+-\s+(?:Song|Album)\s+by\s+(.*?)(?:\s+-\s+Apple Music)?$/i.exec(title); if (m) { title = m[1]; artist = m[2]; } else title = title.replace(/\s+-\s+Apple Music$/i, ''); }
+          else if (/youtu/.test(u.hostname)) { title = title.replace(/\s+-\s+YouTube( Music)?$/i, ''); const m = /^(.*?)\s+[-–]\s+(.*?)(?:\s*[\(\[].*)?$/.exec(title); if (m) { artist = m[1]; title = m[2]; } title = title.replace(/\s*[\(\[]?(official|lyric|music)\s*(video|audio)[\)\]]?/gi, '').trim(); }
+          else if (/song\.link|album\.link/.test(u.hostname)) { const m = /^(.*?)\s+by\s+(.*?)$/i.exec(title); if (m) { title = m[1]; artist = m[2]; } }
+          return out(res, 200, { ok: true, title: title.slice(0, 120), artist: artist.slice(0, 80), source: u.hostname });
+        } catch (e) { return out(res, 502, { ok: false, error: 'Could not read that link' }); }
+      }
       if (req.method === 'POST' && url === '/api/square/webhook') {
         const raw = await rawBody(req); if (!squareSigOk(raw, req.headers['x-square-hmacsha256-signature'])) return out(res, 400, { ok: false, error: 'Bad signature' });
         const ev = JSON.parse(raw); const pay = ev && ev.data && ev.data.object && ev.data.object.payment;
