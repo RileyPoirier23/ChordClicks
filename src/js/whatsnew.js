@@ -18,7 +18,7 @@
     const v = current(); if (!v) return false; let seen = ''; try { seen = localStorage.getItem('rcc-seen-version') || ''; } catch (e) {}
     try { localStorage.setItem('rcc-seen-version', v); } catch (e) {}
     const P = RCC.app && RCC.app.P; if (!seen) return false; // first launch (or upgraded from before this dialog existed): stay quiet
-    if (seen === v) return false; if (document.getElementById('modal').classList.contains('on')) return false; // welcome / splash already up
+    const newer = (x, y) => x.split('.').map(Number).some((n, i) => n !== (y.split('.').map(Number)[i] || 0) ? n > (y.split('.').map(Number)[i] || 0) : false); if (seen === v || newer(seen, v)) return false; if (document.getElementById('modal').classList.contains('on')) return false; // welcome / splash already up
     open(false); return true;
   }
   RCC.whatsnew = { open, maybe, current };
