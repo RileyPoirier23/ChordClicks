@@ -84,3 +84,9 @@ Accounts are local to the computer (scrypt-hashed passwords; libraries in
 - `POST /api/report` `{email, subject, html}` — emails the weekly progress report (needs `RESEND_API_KEY` + `MAIL_FROM`).
 - `POST /api/square/webhook` — Square `payment.updated` → key issued and emailed (needs `SQUARE_WEBHOOK_SIGNATURE_KEY` + `SQUARE_WEBHOOK_URL`). See `docs/CHECKOUT.md`.
 - `GET /api/admin/export?token=…` — orders, trials and sync accounts as JSON for backups (the website's nightly gist backup pulls this when `HELPER_URL` + `HELPER_ADMIN_TOKEN` are set there).
+
+### Sharing a song into the phone app (3.6)
+- Android (PWA or native): the app is a share target. Share a Spotify / Apple Music / YouTube link (or any text) to ChordClicks and it searches Ultimate Guitar for it.
+- iOS: Safari has no share target for web apps. In the native build, `@capacitor/app` listens for `appUrlOpen`; add a URL type `chordclicks` in Xcode (Info → URL Types) and a Shortcut "Find chords" that opens `chordclicks://find?q=<shared text>` from the share sheet. A full iOS Share Extension needs Xcode work; the Shortcut gets the same result.
+- Both: pasting a link into the Find box does the same thing on any platform. The helper server's `GET /api/resolve?url=` turns the link into "title · artist".
+After `npm i` run `npx cap sync` so the App plugin is added to the native projects.
