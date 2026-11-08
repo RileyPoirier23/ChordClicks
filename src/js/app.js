@@ -254,6 +254,9 @@
     if (v === 'find') { fillImportTargets(); paintOnline(); setTimeout(() => $('ug-q').focus(), 50); } if (RCC.record) RCC.record.onView(v === 'record'); if (v === 'learn') RCC.learn.redraw();
   }
   document.querySelectorAll('.nav').forEach(b => b.onclick = () => show(b.dataset.view));
+  $('findb').onclick = () => show('find');
+  // phones: the trainer and backing cards start folded so Practice is the camera, the chord and the sheet
+  if (matchMedia('(max-width:820px)').matches) document.querySelectorAll('details.card').forEach(d => { d.open = false; });
   /* Grouped menus: four groups instead of a twelve-button scroll. Desktop: labelled sections in the rail. Phone: a four-tab bar; a tap opens a sheet with that group's rooms. */
   const GROUPS = [
     { id: 'play', label: 'Play', views: ['practice', 'solo', 'library', 'find'], icon: '<svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>' },

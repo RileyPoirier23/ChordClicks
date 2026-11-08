@@ -774,3 +774,23 @@ body.flash::after{box-shadow:none;border:4px solid var(--ac);opacity:.7}
   body.stage #gbar{display:none}
 }
 @media (max-width:820px){#shell{grid-template-rows:minmax(0,1fr)}#main{padding-bottom:calc(58px + env(safe-area-inset-bottom))}}
+
+/* ---- 3.6.1 tidy: sheet header, collapsible cards, phone header, bigger chord diagram ---- */
+.sh-head{display:flex;flex-direction:column;align-items:stretch;gap:6px;padding:12px 14px 8px}.sh-row{display:flex;align-items:center;gap:8px}.sh-row b{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sh-tools{display:flex;align-items:center;gap:6px;flex-wrap:wrap}.sh-tools .tg{margin-right:4px}
+details.card>summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;margin:0}details.card>summary::-webkit-details-marker{display:none}details.card>summary h4{margin:0}
+details.card>summary::after{content:"+";font-family:var(--mono);color:var(--mut);font-size:14px}details.card[open]>summary::after{content:"–"}details.card[open]>summary{margin-bottom:8px}
+#findb{display:none}
+.now{grid-template-columns:minmax(150px,auto) 160px minmax(0,1fr)}#cdiag{width:160px;height:184px}
+@media (max-width:1100px){.now{grid-template-columns:minmax(0,1fr) 140px}#cdiag{width:140px;height:160px}.strumwrap{grid-column:1 / -1}}
+@media (max-width:820px){
+  #top{flex-wrap:nowrap;align-items:center;gap:8px;padding:10px 12px 8px}#top .search,#vstat,#netpill{display:none}#findb{display:inline-flex}#np{flex:1;min-width:0}#np span{display:none}
+  #top .btn{padding:8px 10px}
+  #tstrings{flex-wrap:nowrap;gap:6px;justify-content:space-between}.peg{flex:1 1 0;width:auto;min-width:0;height:56px;font-size:16px}.peg small{font-size:9px}
+  .sh-tools .btn{flex:1 1 auto;justify-content:center}
+}
+/* record: controls live under the picture instead of on top of the overlay */
+.rec-stage{aspect-ratio:auto;display:flex;flex-direction:column;max-height:none}.rec-stage canvas{aspect-ratio:16/9;width:100%;height:auto;flex:none}.rec-stage.portrait canvas{aspect-ratio:9/16;max-height:calc(100vh - 220px);width:auto;margin:0 auto}
+.rec-bottom{position:static;background:var(--card);border-top:1px solid var(--ln);flex-direction:row;justify-content:space-between;align-items:center;padding:10px 12px;gap:10px}.rec-opts{justify-content:flex-start}.rec-opts .tg{color:var(--mut)}
+@media (max-width:820px){.rec-bottom{flex-direction:column;align-items:stretch}.rec-opts{justify-content:center}.rec-btn{align-self:center}}
+.ov-chips .chip.on{background:var(--paper);border-color:var(--paper);color:var(--ink)}
