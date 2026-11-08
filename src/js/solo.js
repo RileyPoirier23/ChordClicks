@@ -165,10 +165,14 @@
     const hw = fit($('hw')); drawHighway(hw.c, hw.w, hw.h, accent);
     if (sec) { $('solo-scrub').value = Math.round(Math.max(0, pos) / totalBeats() * 1000); $('solo-time').textContent = fmt(Math.max(0, pos)) + ' / ' + fmt(totalBeats()); }
   }
+  const bursts = []; // hit sparks: { x, y, col, t0 }
+  let lastHitSeen = new WeakSet();
   function drawHighway(c, w, h, accent) {
     c.clearRect(0, 0, w, h);
+    const now = performance.now();
     const padT = 14, padB = 14, lane = (h - padT - padB) / 6, hitX = Math.round(w * .2), ppb = Math.max(90, Math.min(170, w / 8));
-    for (let s = 0; s < 6; s++) { const y = padT + s * lane; c.fillStyle = s % 2 ? 'rgba(255,255,255,.025)' : 'rgba(255,255,255,.05)'; c.fillRect(0, y, w, lane); c.fillStyle = RCC.fret.STRING_COLORS[s]; c.globalAlpha = .55; c.fillRect(0, y + lane / 2 - .5, w, 1); c.globalAlpha = 1; }
+    const hotStr = new Set(); if (sec) sec.events.forEach(e => { const d = pos - beatOf(e); if (d > -.05 && d < .35) e.notes.forEach(n => hotStr.add(n.s)); });
+    for (let s = 0; s < 6; s++) { const y = padT + s * lane; c.fillStyle = s % 2 ? 'rgba(255,255,255,.025)' : 'rgba(255,255,255,.05)'; c.fillRect(0, y, w, lane); if (hotStr.has(s)) { const gg = c.createLinearGradient(0, y, 0, y + lane); gg.addColorStop(0, 'transparent'); gg.addColorStop(.5, RCC.fret.STRING_COLORS[s] + '33'); gg.addColorStop(1, 'transparent'); c.fillStyle = gg; c.fillRect(0, y, w, lane); } c.fillStyle = RCC.fret.STRING_COLORS[s]; c.globalAlpha = hotStr.has(s) ? .95 : .55; c.fillRect(0, y + lane / 2 - .5, w, 1); c.globalAlpha = 1; }
     if (!sec) return;
     const b0 = pos - hitX / ppb - 1, b1 = pos + (w - hitX) / ppb + 1, X = b => hitX + (b - pos) * ppb;
     for (let b = Math.ceil(b0); b <= b1; b++) { c.strokeStyle = 'rgba(255,255,255,.07)'; c.lineWidth = 1; c.beginPath(); c.moveTo(X(b), padT); c.lineTo(X(b), h - padB); c.stroke(); }
@@ -181,33 +185,41 @@
     if (waiting) { c.fillStyle = 'rgba(251,191,36,.9)'; c.font = '700 13px system-ui'; c.textAlign = 'left'; c.fillText('Waiting for you…', hitX + 14, padT + 16); }
     if (st.mode !== 'watch') { c.textAlign = 'right'; c.fillStyle = '#fff'; c.font = '800 22px system-ui'; c.fillText(String(sc.pts), w - 14, padT + 24); c.font = '600 12px system-ui'; c.fillStyle = 'rgba(255,255,255,.7)'; c.fillText(`${accPct().toFixed(0)}% · combo ${sc.combo}${sc.combo >= 10 ? ' 🔥' : ''}`, w - 14, padT + 42); c.textAlign = 'left'; }
     const gh = Math.min(lane * .74, 38), gw = Math.min(ppb * .52, 54);
+    // hit bursts (expanding ring + a few sparks), kept for 450 ms
+    for (let i = bursts.length - 1; i >= 0; i--) { const bst = bursts[i], k = (now - bst.t0) / 450; if (k >= 1) { bursts.splice(i, 1); continue; } c.save(); c.globalAlpha = 1 - k; c.strokeStyle = bst.col; c.lineWidth = 3 * (1 - k); c.beginPath(); c.arc(hitX, bst.y, 14 + k * 46, 0, 7); c.stroke(); for (let j = 0; j < 6; j++) { const a = j / 6 * Math.PI * 2 + bst.seed, r = 12 + k * 40; c.fillStyle = bst.col; c.beginPath(); c.arc(hitX + Math.cos(a) * r, bst.y + Math.sin(a) * r * .6, 2.5 * (1 - k), 0, 7); c.fill(); } c.restore(); }
     sec.events.forEach(e => {
       const b = beatOf(e); if (b < b0 || b > b1) return;
       const x = X(b), past = x < hitX - 2, d = (pos - b), hit = e.st === 'hit', miss = e.st === 'miss';
+      if (hit && !lastHitSeen.has(e)) { lastHitSeen.add(e); e.notes.forEach(n => bursts.push({ y: padT + n.s * lane + lane / 2, col: RCC.fret.STRING_COLORS[n.s], t0: now, seed: Math.random() * 6 })); }
       const alpha = hit ? Math.max(0, 1 - d * 2.2) : (st.mode === 'wait' && !e.st && d < .6) ? 1 : past ? Math.max(0, 1 - d * (miss ? 1.6 : .9)) : 1; if (alpha <= 0) return;
+      const approach = Math.max(0, Math.min(1, 1 - (b - pos) / 3)); // 0 far away → 1 at the hit line: gems grow as they come in
       e.notes.forEach(n => {
-        const y = padT + n.s * lane + lane / 2, col = RCC.fret.STRING_COLORS[n.s], hot = Math.abs(d) < .18;
+        const dur = n.beats || (e.len != null ? e.len / sec.colsPerBeat : 1), prog = Math.max(0, Math.min(1, d / Math.max(.25, dur))); // how far through the note we are
+        const lift = n.bend && !past ? 0 : n.bend ? -lane * .45 * Math.min(1, n.bend) * Math.sin(Math.min(1, prog * 1.4) * Math.PI / 2) * (n.release != null && prog > .6 ? 1 - (prog - .6) / .4 : 1) : 0; // bend pulls the gem up, release lets it back down
+        const y = padT + n.s * lane + lane / 2 + lift, col = RCC.fret.STRING_COLORS[n.s], hot = Math.abs(d) < .18, sc = .8 + .2 * approach + (hot ? .12 : 0);
         c.save(); c.globalAlpha = alpha * (past ? .55 : 1);
-        if (hot) { c.shadowColor = col; c.shadowBlur = 26; }
-        c.fillStyle = miss ? '#6b7280' : hit ? '#34d399' : col; c.beginPath(); c.roundRect(x - gw / 2, y - gh / 2, gw * (hit ? 1 + Math.max(0, .5 - d) * .6 : 1), gh, 10); c.fill(); c.shadowBlur = 0;
+        if (hot) { c.shadowColor = col; c.shadowBlur = 28; }
+        const gW = gw * sc * (hit ? 1 + Math.max(0, .5 - d) * .6 : 1), gH = gh * sc;
+        c.fillStyle = miss ? '#6b7280' : hit ? '#34d399' : col; c.beginPath(); c.roundRect(x - gW / 2, y - gH / 2, gW, gH, 10 * sc); c.fill(); c.shadowBlur = 0;
         c.strokeStyle = 'rgba(255,255,255,.75)'; c.lineWidth = hot ? 3 : 1.5; c.stroke();
-        c.fillStyle = '#0b0b12'; c.font = '800 ' + Math.round(gh * .55) + 'px system-ui,sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+        c.fillStyle = '#0b0b12'; c.font = '800 ' + Math.round(gH * .55) + 'px system-ui,sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
         c.fillText(n.fret, x, y + 1);
         c.textBaseline = 'alphabetic';
-        // techniques: bend (curved arrow up + amount), slide / hammer / pull (connector to the destination note), vibrato (wave)
+        // techniques: bend (arrow that grows as the bend happens), slide (ghost gem travelling to the target), hammer/pull (arc), vibrato (moving wave)
         if (n.bend) {
-          const x0 = x + gw / 2 - 2, top = y - lane * .62; c.strokeStyle = '#fff'; c.lineWidth = 2; c.beginPath(); c.moveTo(x0, y - 3); c.quadraticCurveTo(x0 + 18, y - 6, x0 + 18, top + 6); c.stroke();
-          c.fillStyle = '#fff'; c.beginPath(); c.moveTo(x0 + 18, top); c.lineTo(x0 + 13, top + 9); c.lineTo(x0 + 23, top + 9); c.fill();
+          const x0 = x + gw / 2 - 2, top = y - lane * .62, k = past ? Math.min(1, prog * 1.4) : .35; c.strokeStyle = '#fff'; c.lineWidth = 2; c.beginPath(); c.moveTo(x0, y - 3); c.quadraticCurveTo(x0 + 18, y - 6, x0 + 18, y - 3 - (y - 3 - top - 6) * k); c.stroke();
+          const ty = y - 3 - (y - 3 - top) * k; c.fillStyle = '#fff'; c.beginPath(); c.moveTo(x0 + 18, ty); c.lineTo(x0 + 13, ty + 9); c.lineTo(x0 + 23, ty + 9); c.fill();
           c.font = '700 10px system-ui'; c.textAlign = 'left'; c.fillText(BEND_LABEL(n.bend), x0 + 26, top + 8);
           if (n.release != null) { c.setLineDash([3, 3]); c.beginPath(); c.moveTo(x0 + 24, top + 4); c.quadraticCurveTo(x0 + 42, top + 4, x0 + 44, y - 4); c.stroke(); c.setLineDash([]); }
         }
         if (n.to && n.toIdx != null && sec.events[n.toIdx]) {
           const xt = X(beatOf(sec.events[n.toIdx])), up = n.to.fret > n.fret, t = n.to.tech;
           c.strokeStyle = 'rgba(255,255,255,.85)'; c.lineWidth = 2;
-          if (t === '/' || t === '\\') { c.beginPath(); c.moveTo(x + gw / 2, y + (up ? gh * .3 : -gh * .3)); c.lineTo(xt - gw / 2, y + (up ? -gh * .3 : gh * .3)); c.stroke(); }
+          if (t === '/' || t === '\\') { c.beginPath(); c.moveTo(x + gw / 2, y + (up ? gh * .3 : -gh * .3)); c.lineTo(xt - gw / 2, y + (up ? -gh * .3 : gh * .3)); c.stroke();
+            if (past && xt > hitX) { const k = Math.max(0, Math.min(1, (pos - b) / Math.max(.1, beatOf(sec.events[n.toIdx]) - b))), gx = x + (xt - x) * k, gy = y + (up ? gh * .3 : -gh * .3) * (1 - 2 * k); c.globalAlpha = .7; c.fillStyle = col; c.beginPath(); c.roundRect(gx - gw * .3, gy - gh * .3, gw * .6, gh * .6, 7); c.fill(); c.fillStyle = '#0b0b12'; c.font = '800 ' + Math.round(gh * .4) + 'px system-ui'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(Math.round(n.fret + (n.to.fret - n.fret) * k), gx, gy + 1); c.textBaseline = 'alphabetic'; } }
           else { c.beginPath(); c.moveTo(x, y - gh / 2 - 2); c.quadraticCurveTo((x + xt) / 2, y - gh / 2 - lane * .7, xt, y - gh / 2 - 2); c.stroke(); c.fillStyle = '#fff'; c.font = '700 11px system-ui'; c.textAlign = 'center'; c.fillText(t === 'h' ? 'H' : 'P', (x + xt) / 2, y - gh / 2 - lane * .36); }
         }
-        if (n.tech === '~') { c.strokeStyle = 'rgba(255,255,255,.8)'; c.lineWidth = 1.5; c.beginPath(); for (let k = 0; k <= 16; k++) { const px = x + gw / 2 + 3 + k * 2, py = y - gh / 2 - 7 + Math.sin(k * 1.2) * 3; k ? c.lineTo(px, py) : c.moveTo(px, py); } c.stroke(); }
+        if (n.tech === '~') { c.strokeStyle = 'rgba(255,255,255,.8)'; c.lineWidth = 1.5; c.beginPath(); for (let k = 0; k <= 16; k++) { const px = x + gw / 2 + 3 + k * 2, py = y - gh / 2 - 7 + Math.sin(k * 1.2 + now / 90) * 3; k ? c.lineTo(px, py) : c.moveTo(px, py); } c.stroke(); }
         else if (n.tech === 'h' || n.tech === 'p' || n.tech === '/' || n.tech === '\\') { /* shown by the connector from the previous note */ }
         c.restore(); c.textBaseline = 'alphabetic';
       });

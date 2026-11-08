@@ -7,7 +7,7 @@
   const save = () => { try { localStorage.setItem('rcc-tuner', JSON.stringify(cfg)); } catch (e) {} };
   let D, running = false, ctx, src, reconn, an, filters = {}, timer = null, tunedSet = new Set(), intn = null, intnRes = {};
   let lockIdx = 0, hist = [], lastGood = 0, inTuneSince = 0, shown = { cents: 0, ok: false, has: false };
-  let needle = 0, hitIdx = -1, outl = 0, floor = 1, emaC = null, lastStr = -1, strHold = 0;
+  let needle = 0, hitIdx = -1, outl = 0, floor = 1, emaC = null, lastStr = -1, strHold = 0, lastRms = 0, attackHold = 0, buzzed = false;
   const tuning = () => T.TUNINGS[cfg.tuning].notes;
   const gateThr = () => 0.003 + Math.pow(cfg.gate / 100, 2) * 0.1;
 
@@ -88,6 +88,8 @@
     }
     floor = rms < floor ? rms : floor * .9999 + rms * .0001;        // slow noise-floor estimate, keeps hiss from reading as a note
     if (rms < Math.max(thr, Math.min(floor * 1.6, .02))) freq = -1;
+    // the first ~60 ms of a pluck is mostly pick noise: a sudden level jump means wait two frames before trusting the pitch
+    if (rms > lastRms * 2.6 && rms > thr * 2) attackHold = 2; lastRms = rms; if (attackHold > 0) { attackHold--; freq = -1; }
     const now = performance.now();
     if (freq > 0 && prob > .85) {
       // ignore one-off octave/outlier jumps; accept a new note once it persists for 3 readings
@@ -108,9 +110,11 @@
       if (Math.abs(b.cents) > 650) { const n = T.nearestNote(f, cfg.a4); name = n.name; oct = n.octave; cents = n.cents; hitIdx = -1; target = T.noteToFreq(name + oct, cfg.a4); lastStr = -1; }
       else { cents = b.cents; target = b.target; hitIdx = b.index; lastStr = b.index; const m = /^([A-G]#?)(\d)$/.exec(b.note); name = m[1]; oct = +m[2]; }
     }
-    emaC = emaC == null || Math.abs(cents - emaC) > 25 ? cents : emaC * .6 + cents * .4; cents = emaC;
-    const inTune = Math.abs(cents) <= (shown.ok ? 6 : 3); if (inTune) { if (!inTuneSince) inTuneSince = now; } else inTuneSince = 0;
-    shown = { cents, ok: inTune && now - inTuneSince > 250, has: true }; if (shown.ok && hitIdx >= 0) tunedSet.add(hitIdx); if (intn) feedIntn(f, now);
+    // smoothing adapts: small wobbles get averaged hard (steady needle), real moves follow quickly
+    const dlt = emaC == null ? 99 : Math.abs(cents - emaC), k = dlt > 25 ? 1 : dlt > 8 ? .45 : .22; emaC = emaC == null ? cents : emaC * (1 - k) + cents * k; cents = emaC;
+    const inTune = Math.abs(cents) <= (shown.ok ? 6 : 3); if (inTune) { if (!inTuneSince) inTuneSince = now; } else { inTuneSince = 0; buzzed = false; }
+    shown = { cents, ok: inTune && now - inTuneSince > 250, has: true };
+    if (shown.ok && !buzzed) { buzzed = true; try { if (navigator.vibrate) navigator.vibrate(30); } catch (e) {} const tn = $('tnote'); tn.classList.remove('lock'); void tn.offsetWidth; tn.classList.add('lock'); } if (shown.ok && hitIdx >= 0) tunedSet.add(hitIdx); if (intn) feedIntn(f, now);
     $('tnote').innerHTML = name + '<small>' + oct + '</small>'; $('tnote').style.color = shown.ok ? 'var(--gr)' : '';
     const dir = shown.ok ? 'In tune ✓' : Math.abs(cents) < 4 ? 'Almost…' : Math.abs(cents) < 12 ? (cents < 0 ? 'A touch low ↑' : 'A touch high ↓') : cents < 0 ? 'Too low – tune up ↑' : 'Too high – tune down ↓';
     $('tinfo').textContent = f.toFixed(1) + ' Hz · ' + (cents > 0 ? '+' : '') + cents.toFixed(Math.abs(cents) < 10 ? 1 : 0) + '¢ · ' + dir;

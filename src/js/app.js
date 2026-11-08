@@ -249,11 +249,32 @@
   function show(v) {
     if (v !== 'tuner') RCC.tuner.stop();
     document.querySelectorAll('.nav').forEach(b => b.classList.toggle('on', b.dataset.view === v));
-    views.forEach(n => $('v-' + n).classList.toggle('on', n === v));
+    views.forEach(n => $('v-' + n).classList.toggle('on', n === v)); if (RCC._paintGroups) RCC._paintGroups(v);
     if (v === 'library') renderLib(); if (v === 'scales') RCC.scales.redraw(); if (v === 'stream') renderStreamUI(); if (v === 'practice') showChord();
     if (v === 'find') { fillImportTargets(); paintOnline(); setTimeout(() => $('ug-q').focus(), 50); } if (RCC.record) RCC.record.onView(v === 'record'); if (v === 'learn') RCC.learn.redraw();
   }
   document.querySelectorAll('.nav').forEach(b => b.onclick = () => show(b.dataset.view));
+  /* Grouped menus: four groups instead of a twelve-button scroll. Desktop: labelled sections in the rail. Phone: a four-tab bar; a tap opens a sheet with that group's rooms. */
+  const GROUPS = [
+    { id: 'play', label: 'Play', views: ['practice', 'solo', 'library', 'find'], icon: '<svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>' },
+    { id: 'learn', label: 'Learn', views: ['learn', 'scales', 'tuner'], icon: '<svg viewBox="0 0 24 24"><path d="M22 10 12 5 2 10l10 5 10-5z"/><path d="M6 12v5c3 2 9 2 12 0v-5"/></svg>' },
+    { id: 'studio', label: 'Studio', views: ['gear', 'record', 'stream'], icon: '<svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"/><circle cx="12" cy="9" r="2.5"/><circle cx="12" cy="16" r="1.2"/></svg>' },
+    { id: 'more', label: 'More', views: ['support', 'settings'], icon: '<svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>' },
+  ];
+  const groupOf = v => GROUPS.find(g => g.views.includes(v)) || GROUPS[0];
+  (function buildGroups() {
+    const rail = $('rail'), navs = Object.fromEntries([...rail.querySelectorAll('.nav')].map(b => [b.dataset.view, b]));
+    const acct = $('acct'), spacer = rail.querySelector('.spacer');
+    GROUPS.forEach(g => { const sec = document.createElement('div'); sec.className = 'ngrp'; sec.dataset.g = g.id; sec.innerHTML = `<div class="ngl">${g.label}</div>`; g.views.forEach(v => navs[v] && sec.appendChild(navs[v])); rail.insertBefore(sec, spacer || acct || null); });
+    const bar = document.createElement('div'); bar.id = 'gbar'; bar.innerHTML = GROUPS.map(g => `<button class="gtab" data-g="${g.id}">${g.icon}<span>${g.label}</span></button>`).join(''); document.body.appendChild(bar);
+    const sheet = $('navsheet');
+    const openSheet = g => { sheet.hidden = false; sheet.querySelector('.ns-title').textContent = g.label; sheet.querySelector('.ns-items').innerHTML = g.views.map(v => { const b = navs[v]; return `<button class="ns-item ${$('v-' + v).classList.contains('on') ? 'on' : ''}" data-view="${v}">${b.querySelector('svg').outerHTML}<span>${b.querySelector('span').textContent}</span></button>`; }).join('') + (g.id === 'more' ? `<button class="ns-item" id="ns-acct"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg><span>${Store.user ? esc(Store.user.name) : 'Sign in'}</span></button>` : '');
+      const na = sheet.querySelector('#ns-acct'); if (na) na.onclick = () => { closeSheet(); $('acct').click(); }; requestAnimationFrame(() => sheet.classList.add('on')); sheet.querySelectorAll('.ns-item[data-view]').forEach(b => b.onclick = () => { closeSheet(); show(b.dataset.view); }); };
+    const closeSheet = () => { sheet.classList.remove('on'); setTimeout(() => { sheet.hidden = true; }, 220); };
+    sheet.querySelector('.ns-bd').onclick = closeSheet;
+    bar.querySelectorAll('.gtab').forEach(b => b.onclick = () => { const g = GROUPS.find(x => x.id === b.dataset.g); const curV = document.querySelector('.view.on').id.slice(2); if (g.views.length === 1) show(g.views[0]); else if (!g.views.includes(curV) && g.id !== 'more') { show(g.views[0]); openSheet(g); } else openSheet(g); });
+    RCC._paintGroups = v => { const g = groupOf(v); bar.querySelectorAll('.gtab').forEach(b => b.classList.toggle('on', b.dataset.g === g.id)); rail.querySelectorAll('.ngrp').forEach(s => s.classList.toggle('on', s.dataset.g === g.id)); };
+  })();
 
   /* ================================================================ library UI */
   let selKey = 'all', selMode = false; const selIds = new Set(), metaCache = new Map();
@@ -392,6 +413,11 @@
   async function ugSearch(q, pg = 1) {
     q = String(q || '').trim(); if (!q) return;
     if (!RCC.ug.online()) { toast('You’re offline — only saved songs are available'); return; }
+    if (RCC.ug.isLink(q)) { // a Spotify / Apple Music / YouTube link: find out what song it is, then search for its chords
+      $('ug-res').innerHTML = `<div class="empty"><b>Reading that link…</b>Spotify, Apple Music and YouTube links turn into a song search.</div>`;
+      const r = await RCC.ug.resolveLink(q); if (!r) { toast('Could not read that link. Type the song name instead.'); return; }
+      toast(`Found “${r.title}”${r.artist ? ' by ' + r.artist : ''}`); return ugSearch(r.query, 1);
+    }
     UG.q = q; $('ug-q').value = q; UG.busy = 'search'; if (pg === 1) { UG.results = []; UG.sel = -1; UG.cur = null; $('ug-prev').innerHTML = '<div class="empty"><b>Nothing selected</b>Pick a result to preview it before you import.</div>'; } ugRender();
     try { const r = await RCC.ug.search(q, { type: UG.type, page: pg }); if (UG.q !== q) return; UG.page = pg; UG.results = pg === 1 ? r.results : UG.results.concat(r.results); UG.more = r.more; }
     catch (e) { toast(ugErr(e)); }
@@ -420,11 +446,16 @@
     const nTabs = SG.parseTabs(x.text).sections.length, ns = (x.strums || []).length, m = x.meta || {};
     toast(`Imported “${x.title}”${ns ? ' · ' + ns + ' strumming pattern' + (ns > 1 ? 's' : '') : ''}${m.capo ? ' · capo ' + m.capo : ''}${m.tuning ? ' · ' + m.tuning : ''}${nTabs ? ' · ' + nTabs + ' tab section' + (nTabs > 1 ? 's' : '') : ''}`);
     playList([saved.id], saved.id, pid ? Store.playlist(pid).name : '');
+    if (UG.type === 'solo' && nTabs) { RCC.solo.setSong(saved); setTimeout(() => { show('solo'); RCC.solo.follow(false); toast('Opened in Solo — press Play'); }, 60); }
   }
   $('ug-go').onclick = () => ugSearch($('ug-q').value); $('ug-q').onkeydown = e => { if (e.key === 'Enter') ugSearch($('ug-q').value); };
   $('ug-sort').onchange = e => { UG.sort = e.target.value; ugRender(); };
   document.querySelectorAll('#ug-type button').forEach(b => b.onclick = () => { UG.type = b.dataset.v; document.querySelectorAll('#ug-type button').forEach(x => x.classList.toggle('on', x === b)); if (UG.q) ugSearch(UG.q); });
   $('find-off-lib').onclick = () => show('library');
+  // Shared into the app (Android share sheet via the PWA share_target, or a chordclicks:// link on iOS/Android): search for it
+  function handleShared(text) { const t = String(text || '').trim(); if (!t) return; show('find'); ugSearch(t); }
+  try { const sp = new URLSearchParams(location.search); const shared = sp.get('share') || sp.get('text') || sp.get('url'); if (shared) { history.replaceState(null, '', location.pathname); setTimeout(() => handleShared(shared), 400); } } catch (e) {}
+  try { const App = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App; if (App && App.addListener) App.addListener('appUrlOpen', ev => { try { const u = new URL(ev.url); handleShared(u.searchParams.get('q') || u.searchParams.get('url') || u.searchParams.get('text') || ''); } catch (e) {} }); } catch (e) {}
   $('ug').onclick = () => {
     const v = $('q').value.trim(), hit = Store.lib.songs.find(x => (x.title + ' — ' + x.artist) === v);
     if (hit) { playList([hit.id], hit.id, ''); return; } if (!v) return;
@@ -540,7 +571,7 @@
   $('exp').onclick = async () => { const r = await Store.exportLib(); if (r && r.ok) toast('Songs exported'); };
   $('imp-lib').onclick = async () => {
     if (!R) { const f = document.createElement('input'); f.type = 'file'; f.accept = '.json,application/json'; f.onchange = async () => { try { const n = Store.mergeLib(JSON.parse(await f.files[0].text())); toast('Imported ' + n + ' new song' + (n === 1 ? '' : 's')); } catch (e) { toast('That file is not a valid song export.'); } }; f.click(); return; }
-    const r = await R.lib.importFrom(); if (r.ok) { const n = Store.mergeLib(r.lib); toast('Imported ' + n + ' new song' + (n === 1 ? '' : 's')); } else if (r.error) toast(r.error); };
+    const r = await (R || RCC.webBridge).lib.importFrom(); if (r.ok) { const n = Store.mergeLib(r.lib); toast('Imported ' + n + ' new song' + (n === 1 ? '' : 's')); } else if (r.error) toast(r.error); };
 
   /* ================================================================ accounts */
   function renderAcct() {

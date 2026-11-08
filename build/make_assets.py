@@ -4,6 +4,7 @@ import os
 OUT = os.path.dirname(os.path.abspath(__file__))
 FONT_B = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'
 A, B = (139, 92, 246), (236, 72, 153)
+RED, PAPER, INK = (200, 16, 46), (243, 240, 232), (18, 18, 18)
 
 def lerp(c1, c2, t): return tuple(int(c1[i] + (c2[i] - c1[i]) * t) for i in range(3))
 def gradient(w, h, c1, c2, diag=True):
@@ -15,33 +16,32 @@ def gradient(w, h, c1, c2, diag=True):
     return g
 
 def logo(size):
-    """Guitar-pick badge with a lightning bolt, drawn at 4x then downsampled."""
+    """The ChordClicks mark: a paper guitar pick with a chord grid and one ink dot, drawn at 4x then downsampled."""
     S = size * 4; sc = S / 64
-    pick = Image.new('L', (S, S), 0); d = ImageDraw.Draw(pick)
-    # pick outline (polygon sampled from a bezier-ish shape)
-    pts = []
+    img = Image.new('RGBA', (S, S), (0, 0, 0, 0)); d = ImageDraw.Draw(img)
     import math
+    pts = []
     for i in range(361):
-        a = math.radians(i); x = 32 + 27 * math.sin(a) * (1 - 0.12 * math.cos(a)) ** 1.0
-        # teardrop: wide top, pointed bottom
-        y = 32 - 29 * math.cos(a) * (1.0 if math.cos(a) > 0 else 1.0)
-        k = (1 - math.cos(a)) / 2  # 0 top .. 1 bottom
-        w = 27 * (1 - 0.78 * k ** 2.2)
-        pts.append((32 + w * math.sin(a), 32 - 29 * math.cos(a) * (1.02)))
-    d.polygon([(x * sc, y * sc) for x, y in pts], fill=255)
-    img = Image.new('RGBA', (S, S), (0, 0, 0, 0)); img.paste(gradient(S, S, A, B), (0, 0), pick)
-    bolt = ImageDraw.Draw(img)
-    bolt.polygon([(x * sc, y * sc) for x, y in [(36, 11), (19, 36), (29.5, 36), (26, 53), (45, 27), (34, 27), (39, 11)]], fill=(255, 255, 255, 255))
+        a = math.radians(i); k = (1 - math.cos(a)) / 2
+        w = 18.5 * (1 - 0.78 * k ** 2.2)
+        pts.append(((32 + w * math.sin(a)) * sc, (32 - 23 * math.cos(a)) * sc))
+    d.polygon(pts, fill=PAPER + (255,))
+    lw = int(2.4 * sc)
+    for x in (24.5, 32, 39.5):
+        y0, y1 = (19.5, 41.5) if x != 32 else (17.5, 43.5)
+        d.rounded_rectangle([x * sc - lw / 2, y0 * sc, x * sc + lw / 2, y1 * sc], radius=lw // 2, fill=RED + (255,))
+    for (x0, x1, y) in ((20.5, 43.5, 26.5), (22, 42, 35)):
+        d.rounded_rectangle([x0 * sc, y * sc - lw / 2, x1 * sc, y * sc + lw / 2], radius=lw // 2, fill=RED + (255,))
+    r = 4.2 * sc; d.ellipse([32 * sc - r, 30.75 * sc - r, 32 * sc + r, 30.75 * sc + r], fill=INK + (255,))
     return img.resize((size, size), Image.LANCZOS)
 
 def squircle_icon(size):
-    S = size; bg = Image.new('RGBA', (S, S), (0, 0, 0, 0)); m = Image.new('L', (S, S), 0)
+    """Red tile with the mark, matching the site: no gradients, no glow."""
+    S = size; out = Image.new('RGBA', (S, S), (0, 0, 0, 0)); m = Image.new('L', (S, S), 0)
     ImageDraw.Draw(m).rounded_rectangle([0, 0, S - 1, S - 1], radius=int(S * .22), fill=255)
-    base = gradient(S, S, (20, 20, 36), (10, 10, 18), diag=True); bg.paste(base, (0, 0), m)
-    glow = Image.new('RGBA', (S, S), (0, 0, 0, 0)); ImageDraw.Draw(glow).ellipse([S * .1, S * .1, S * .9, S * .9], fill=A + (110,))
-    bg.alpha_composite(glow.filter(ImageFilter.GaussianBlur(S * .12)))
-    lg = logo(int(S * .68)); bg.alpha_composite(lg, ((S - lg.width) // 2, int(S * .17)))
-    out = Image.new('RGBA', (S, S), (0, 0, 0, 0)); out.paste(bg, (0, 0), m); return out
+    tile = Image.new('RGBA', (S, S), RED + (255,)); out.paste(tile, (0, 0), m)
+    lg = logo(int(S * 1.0)); out.alpha_composite(lg, (0, 0))
+    return out
 
 icon = squircle_icon(1024)
 icon.resize((512, 512), Image.LANCZOS).save(os.path.join(OUT, 'icon.png'))

@@ -64,6 +64,8 @@
       const cx = mx(noteX(n.fret)), cy = sy(n.s), col = n.color || STRING_COLORS[n.s];
       ctx.save();
       if (n.kind === 'cur') {
+        const pulse = (performance.now() % 900) / 900; // soft ring that breathes out from the note
+        ctx.globalAlpha = .55 * (1 - pulse); ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(cx, cy, R * (1.1 + pulse * 1.3), 0, 7); ctx.stroke(); ctx.globalAlpha = 1;
         ctx.shadowColor = col; ctx.shadowBlur = compact ? 14 : 30; ctx.fillStyle = col;
         ctx.beginPath(); ctx.arc(cx, cy, R * 1.05, 0, 7); ctx.fill(); ctx.shadowBlur = 0;
         ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5; ctx.stroke();

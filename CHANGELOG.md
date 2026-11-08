@@ -2,6 +2,17 @@
 
 The newest version is at the top. Each release's section becomes the GitHub release notes and the "What's new" dialog in the app.
 
+## 3.6.0 — 2026-11-08
+- **Menus instead of a scroll**: four groups (Play, Learn, Studio, More). Labelled sections on desktop; a four-tab bar with a slide-up menu on phones.
+- **Accounts on phones and the web** work now: sign in or register on the device, keep a library per account, and cloud sync through the helper server.
+- **Find**: a Solos filter that searches guitar solos as tab and opens them in Solo mode; paste a Spotify, Apple Music or YouTube link and it becomes a song search; Android share sheet into the app.
+- **Phones**: Ultimate Guitar is fetched natively first and falls back to the helper server automatically.
+- **Solo**: gems grow as they approach, bends pull the gem up and release it, slides send a ghost gem travelling to the target fret, hits burst, the active string glows, vibrato moves.
+- **"Hear it" sounds like a guitar**: plucked-string synthesis replaces the organ-like tones for chords and notes everywhere.
+- **Tuner**: ignores the pick attack, steadier needle that still follows real moves, a lock flash and a vibration when a string lands in tune.
+- **New logo**: a pick with a chord grid, same red as the site, on every platform.
+- Pro dialogs show three features and fold the rest; smoother view, dialog and button motion.
+
 ## 3.5.0 — 2026-11-02
 - **Slow-downer** in Gear: load any recording, slow it to half speed at the same pitch, loop a lick between A and B, count it in from the Practice tempo, and hand the file to Chords from a recording. (Pro)
 - **Songwriter** in Learn → Write: pick a key, tap the chords that fit (the likely next ones glow), start from ten classic shapes, build verse/chorus/bridge, hear it with the backing band, open in Practice, save, or export a backing WAV. Capo hints when the shapes are hard. (play / save / export are Pro)

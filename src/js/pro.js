@@ -57,11 +57,17 @@
     ['Learn it. Prove it.', 'Chord-change drills with a stopwatch, full ear training, every arpeggio, triad and CAGED shape on the neck.', 'trainer'],
     ['Teach on camera.', 'Virtual camera for Zoom and OBS, scenes with hotkeys, Twitch song requests, unlimited library and set lists.', 'stream'],
   ];
+  /** Three features up front (the one you tapped first), the rest folded behind a toggle, so the pitch is a glance, not a scroll. */
+  function featList(hl, compact) {
+    const top = ['score', 'slow', 'trainer'], order = [hl, ...top.filter(x => x !== hl)].filter(Boolean), head = order.map(id => FEATURE_OF[id]).filter(Boolean), rest = FEATURES.filter(f => !order.includes(f[0]));
+    const li = x => `<li class="${x[0] === hl ? 'hl' : ''}"><b>${esc(x[1])}</b>${compact ? '' : `<span>${esc(x[2])}</span>`}</li>`;
+    return `<ul class="pro-list ${compact ? 'compact' : ''}">${head.map(li).join('')}</ul><details class="pro-more"><summary>and ${rest.length} more</summary><ul class="pro-list ${compact ? 'compact' : ''}">${rest.map(li).join('')}</ul></details>`;
+  }
   function splash(force) {
     if (!force) { if (has()) return false; const n = (lsGetRaw('rcc-launch', 0) | 0) + 1; lsSet('rcc-launch', n); const last = lsGetRaw('rcc-splash-at', 0); if (n % 3 !== 0 || Date.now() - last < 20 * 3600e3) return false; lsSet('rcc-splash-at', Date.now()); }
     const a = RCC.app; if (!a) return false; const [h, p, f] = SPLASH[Math.floor(Math.random() * SPLASH.length)];
     a.dialog(`<div class="pro-splash"><span class="pro-tag big">PRO</span><h2>${h}</h2><p>${p}</p>
-      <ul class="pro-list compact">${FEATURES.map(x => `<li class="${x[0] === f ? 'hl' : ''}"><b>${a.esc(x[1])}</b></li>`).join('')}</ul>
+      ${featList(f, true)}
       <div class="row" style="justify-content:space-between;margin-top:12px;gap:8px"><div class="row" style="margin:0;gap:8px">${trialUsed() ? '' : `<button class="btn p" id="sp-trial">Try Pro free for ${TRIAL_DAYS} days</button>`}${live() ? `<a class="btn ${trialUsed() ? 'p' : ''}" href="${a.esc(cfg.buy)}" target="_blank" rel="noreferrer">Buy Pro · ${a.esc(cfg.price)} once</a>` : ''}</div><button class="btn ghost" id="sp-x">Not now</button></div>
       <div class="small" style="margin-top:8px">${live() ? 'No subscription. Works offline on all your devices.' : 'Keys go on sale soon. Everything stays free to practice with.'}</div></div>`, () => {
       document.getElementById('sp-x').onclick = a.closeDlg; const t = document.getElementById('sp-trial'); if (t) t.onclick = () => trialDialog();
@@ -106,7 +112,7 @@
     const a = RCC.app; if (!a) return; const f = FEATURE_OF[feature], esc = a.esc;
     a.dialog(`<div class="pro-head"><span class="pro-tag big">PRO</span><h2>${f ? esc(f[1]) : 'ChordClicks Pro'}</h2></div>
       <p class="small" style="margin:4px 0 12px;line-height:1.5">${f ? esc(f[2]) : 'Everything that turns practice into progress.'} ${trialUsed() ? '' : `Try everything free for ${TRIAL_DAYS} days — no card, no account.`}</p>
-      <ul class="pro-list">${FEATURES.map(x => `<li class="${x[0] === feature ? 'hl' : ''}"><b>${esc(x[1])}</b><span>${esc(x[2])}</span></li>`).join('')}</ul>
+      ${featList(feature, false)}
       <div class="row" style="justify-content:space-between;margin-top:14px;gap:8px"><div class="row" style="margin:0;gap:8px">${trialUsed() ? '' : `<button class="btn p" id="pro-trial">Start ${TRIAL_DAYS}-day trial</button>`}${live() ? `<a class="btn ${trialUsed() ? 'p' : ''}" href="${esc(cfg.buy)}" target="_blank" rel="noreferrer">Buy Pro · ${esc(cfg.price)} once</a>` : ''}</div><button class="btn ghost" id="pro-key">I have a key</button></div>
       <div class="small" style="margin-top:10px">${live() ? 'One payment, yours forever, works offline. Your key comes by email.' : 'Pro keys go on sale soon at 506clicks.ca. The trial is the full thing in the meantime.'}</div>`, () => {
       const t = document.getElementById('pro-trial'); if (t) t.onclick = () => trialDialog();
